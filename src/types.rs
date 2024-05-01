@@ -1,9 +1,11 @@
 use anyhow::anyhow;
 use std::{
-    borrow::Cow, collections::HashMap, path::{Path, PathBuf}
+    borrow::Cow,
+    collections::HashMap,
+    path::{Path, PathBuf},
 };
 
-use crate::utils;
+use crate::{utils, Ctx};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
 pub struct Date {
@@ -155,7 +157,7 @@ pub struct Entry<'m> {
 }
 
 impl EntryMeta {
-    pub fn entry_from_path(path_prefix: &Path, path: &Path) -> anyhow::Result<Self> {
+    pub fn entry_from_path(ctx: &Ctx, path_prefix: &Path, path: &Path) -> anyhow::Result<Self> {
         let mut path_without_prefix = path.strip_prefix(path_prefix)?.iter();
         let group = path_without_prefix
             .next()
@@ -190,12 +192,16 @@ impl EntryMeta {
             } else {
                 Cow::Owned(path.with_extension(""))
             };
-            utils::path_to_http_url(path)?
+            utils::path_to_url(None, path)?
         };
 
         let (dt, slug) = file_name_into_date_and_slug(&file_name);
         if let Some(dt) = dt {
             let (date, time) = dt;
+            let out_file = PathBuf::from(format!("{}", date.year))
+                .join(slug)
+                .join("index.html");
+            let out_asset_dir = PathBuf::from(format!("{}", date.year)).join(slug);
             Ok(EntryMeta {
                 sort_key: file_name.to_owned(),
                 group,
@@ -205,25 +211,35 @@ impl EntryMeta {
                 file_path: path.to_owned(),
                 asset_dir: parent_dir.to_owned(),
                 canonical_name,
-                out_file: PathBuf::from(format!("{}", date.year)).join(format!("{slug}.html")),
-                out_asset_dir: PathBuf::from(format!("{}", date.year)).join(slug),
-                asset_url: format!("{}/{slug}", date.year),
-                permalink: format!("{}/{slug}.html", date.year),
+                permalink: ctx.path_to_absolute_url(&out_file).expect("valid path"),
+                asset_url: ctx
+                    .path_to_absolute_url(&out_asset_dir)
+                    .expect("valid path"),
+                out_file,
+                out_asset_dir,
             })
         } else {
+            let out_file = if slug == "index" {
+                PathBuf::from(format!("{slug}.html"))
+            } else {
+                PathBuf::from(slug).join("index.html")
+            };
+            let out_asset_dir = PathBuf::from(slug);
             Ok(EntryMeta {
                 sort_key: file_name.to_owned(),
                 group,
-                out_asset_dir: PathBuf::from(&file_name),
-                out_file: PathBuf::from(format!("{slug}.html")),
                 date: None,
                 time: None,
                 slug: slug.to_owned(),
-                canonical_name,
                 file_path: path.to_owned(),
                 asset_dir: parent_dir.to_owned(),
-                asset_url: format!("{slug}"),
-                permalink: format!("{slug}.html"),
+                canonical_name,
+                permalink: ctx.path_to_absolute_url(&out_file).expect("valid path"),
+                asset_url: ctx
+                    .path_to_absolute_url(&out_asset_dir)
+                    .expect("valid path"),
+                out_file,
+                out_asset_dir,
             })
         }
     }

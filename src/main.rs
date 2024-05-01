@@ -10,6 +10,7 @@ use notify_debouncer_full::{new_debouncer, notify::*, DebounceEventResult};
 
 mod cli;
 mod config;
+mod ctx;
 mod djot;
 mod front_matter;
 mod highlight;
@@ -19,9 +20,8 @@ mod render;
 mod types;
 mod utils;
 
+use ctx::Ctx;
 use out::Out;
-
-use crate::utils::path_to_http_url;
 
 #[derive(Debug)]
 struct Group {
@@ -45,6 +45,7 @@ impl Group {
 }
 
 fn collect_entries<'a>(
+    ctx: &'a Ctx,
     path_prefix: &'a Path,
     path: &Path,
 ) -> impl Iterator<Item = anyhow::Result<types::EntryMeta>> + 'a {
@@ -59,7 +60,11 @@ fn collect_entries<'a>(
                 if entry.file_type().is_dir() || !name.ends_with(".dj") {
                     None
                 } else {
-                    Some(types::EntryMeta::entry_from_path(path_prefix, entry.path()))
+                    Some(types::EntryMeta::entry_from_path(
+                        ctx,
+                        path_prefix,
+                        entry.path(),
+                    ))
                 }
             }
             Err(err) => Some(Err(err.into())),
@@ -67,6 +72,7 @@ fn collect_entries<'a>(
 }
 
 fn collect_entry_groups(
+    ctx: &Ctx,
     path: impl AsRef<Path>,
 ) -> anyhow::Result<(Vec<Group>, Vec<types::EntryMeta>)> {
     let path = path.as_ref();
@@ -93,7 +99,7 @@ fn collect_entry_groups(
 
         if group.file_type().is_dir() {
             let start_idx = entries.len();
-            for entry in collect_entries(path, walk_path) {
+            for entry in collect_entries(ctx, path, walk_path) {
                 entries.push(entry?);
             }
             let end_idx = entries.len();
@@ -104,15 +110,10 @@ fn collect_entry_groups(
     anyhow::Ok((groups, entries))
 }
 
-fn build(
-    path: &Path,
-    build_kind: cli::BuildKind,
-    renderer: &render::Renderer,
-    base_url: &str,
-) -> anyhow::Result<()> {
+fn build(ctx: &Ctx, path: &Path, renderer: &render::Renderer) -> anyhow::Result<()> {
     let out = Out::at("./out")?;
 
-    let (groups, entries) = collect_entry_groups(path.join("entries"))?;
+    let (groups, entries) = collect_entry_groups(&ctx, path.join("entries"))?;
 
     log::info!("Found {} entry group(s):", groups.len());
     for group in groups.iter() {
@@ -180,7 +181,7 @@ fn build(
         });
 
     // When in production-mode, filter out non-released entries
-    let (groups, entries, mut parsed, front_matter) = if build_kind.is_production() {
+    let (groups, entries, mut parsed, front_matter) = if ctx.build_kind().is_production() {
         let before = entries.len();
 
         let mut groups = groups;
@@ -246,7 +247,7 @@ fn build(
             .enumerate()
             .map(|(linker_idx, parsed)| {
                 let internal_links =
-                    djot::rewrite_and_emit_internal_links(parsed, &entries_by_name, base_url)?;
+                    djot::rewrite_and_emit_internal_links(parsed, &entries_by_name)?;
 
                 let mut linkee_indices = internal_links
                     .into_iter()
@@ -382,9 +383,11 @@ fn build(
                         };
                         let page_permalink = {
                             let out_file = out_file.clone();
+                            // can we do away with this clone?
+                            let ctx = ctx.clone();
                             move |page| -> String {
                                 let path = out_file(page);
-                                path_to_http_url(path).unwrap()
+                                ctx.path_to_absolute_url(path).unwrap()
                             }
                         };
 
@@ -533,23 +536,16 @@ fn main() -> anyhow::Result<()> {
             };
             let site_config = site_config.as_ref().unwrap();
 
-            let base_url = if build_kind.is_production() {
-                &site_config.base_url
-            } else {
-                &site_config.base_url_develop
-            };
+            let ctx = Ctx::from_site_config(build_kind, site_config);
 
             if config_changed || matches!(change, FsChange::Template) {
                 log::info!("Reloading templates…");
-                renderer = Some(render::Renderer::build(
-                    base_url.to_owned(),
-                    args.path.join("templates"),
-                )?);
+                renderer = Some(render::Renderer::build(&ctx, args.path.join("templates"))?);
             }
 
             log::info!("Building…");
             let instant = std::time::Instant::now();
-            if let Err(err) = build(&args.path, build_kind, renderer.as_ref().unwrap(), base_url) {
+            if let Err(err) = build(&ctx, &args.path, renderer.as_ref().unwrap()) {
                 log::error!("{:?}", err);
             }
             log::info!(
@@ -579,13 +575,9 @@ fn main() -> anyhow::Result<()> {
     } else {
         let site_config: config::SiteConfig =
             toml::from_str(&std::fs::read_to_string(&site_config_path)?)?;
-        let base_url = if build_kind.is_production() {
-            &site_config.base_url
-        } else {
-            &site_config.base_url_develop
-        };
-        let renderer = render::Renderer::build(base_url.to_owned(), args.path.join("templates"))?;
-        build(&args.path, build_kind, &renderer, base_url)?;
+        let ctx = Ctx::from_site_config(build_kind, &site_config);
+        let renderer = render::Renderer::build(&ctx, args.path.join("templates"))?;
+        build(&ctx, &args.path, &renderer)?;
     }
 
     Ok(())

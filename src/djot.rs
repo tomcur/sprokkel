@@ -16,14 +16,12 @@ use crate::{highlight, types, utils};
 pub fn rewrite_and_emit_internal_links<'entries>(
     events: &mut Vec<Event<'_>>,
     entries_by_name: &HashMap<&str, &'entries types::EntryMetaAndFrontMatter<'entries>>,
-    root_url: &str,
 ) -> anyhow::Result<Vec<&'entries types::EntryMetaAndFrontMatter<'entries>>> {
     let mut internal_links = vec![];
 
     fn rewrite_link<'entries>(
         old_link: &mut Cow<'_, str>,
         entries_by_name: &HashMap<&str, &'entries types::EntryMetaAndFrontMatter<'entries>>,
-        root_url: &str,
     ) -> anyhow::Result<Option<&'entries types::EntryMetaAndFrontMatter<'entries>>> {
         if &old_link[0..2] == "~/" {
             let (link, anchor) = match old_link.find('#') {
@@ -32,7 +30,7 @@ pub fn rewrite_and_emit_internal_links<'entries>(
             };
 
             if let Some(entry) = entries_by_name.get(link) {
-                *old_link = Cow::Owned(format!("{root_url}/{}{}", &entry.meta.permalink, anchor));
+                *old_link = Cow::Owned(format!("{}{}", &entry.meta.permalink, anchor));
                 return Ok(Some(entry));
             } else {
                 anyhow::bail!("Unknown internal link: {old_link}");
@@ -45,12 +43,12 @@ pub fn rewrite_and_emit_internal_links<'entries>(
     for event in events {
         match event {
             Event::Start(Container::Link(link, _), _) => {
-                if let Some(entry) = rewrite_link(link, entries_by_name, root_url)? {
+                if let Some(entry) = rewrite_link(link, entries_by_name)? {
                     internal_links.push(entry);
                 }
             }
             Event::End(Container::Link(link, _)) => {
-                rewrite_link(link, entries_by_name, root_url)?;
+                rewrite_link(link, entries_by_name)?;
             }
             _ => {}
         }
