@@ -1,0 +1,34 @@
+{% extends "_partials/base.html" %}
+{% block body %}
+{% set p = paginate(entries["mini-library-of-babel"], 3) %}
+
+<section class="post-listing">
+  <p>
+    Here are some excerpts of books in
+    <a href="https://libraryofbabel.info">the Library of Babel</a>.
+  </p>
+  {% for idx in p.indices %}
+    {% set entry = entries["mini-library-of-babel"][idx] %}
+    <article>
+      <header>
+        <h1><a href="{{ entry.permalink }}">{{ entry.title }}</a></h1>
+      </header>
+      <section class="post-content">
+          {{ entry.summary | safe }}
+      </section>
+    </article>
+  {% endfor %}
+</section>
+
+<nav class="paginator">
+  <div>{% if p.previous %}<a href="{{ p.previous}}">← Previous page</a>{% endif %}</div>
+  <div>Page {{ p.current_page + 1 }} of {{ p.page_count }}</div>
+  <div>{% if p.next %}<a href="{{ p.next}}">Next page →</a>{% endif %}</div>
+</nav>
+
+<hr>
+
+<p>The current pagination context:</p>
+<pre><code>{{ p | pprint }}</code></pre>
+
+{% endblock %}

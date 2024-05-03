@@ -1,0 +1,34 @@
+# Syntax highlighting
+
+Sprokkel can perform build-time syntax highlighting using
+[tree-sitter](https://tree-sitter.github.io/tree-sitter).
+
+To syntax highlight, use a code fence (\`\`\`) with a language name. For example
+
+````djot
+Define some species of Brassica...
+
+```rust
+#[non_exhaustive]
+enum Brassica {
+    Broccoli,
+    Cabbage,
+    Cauliflower,
+    Kale,
+    PakChoi,
+}
+```
+````
+
+The currently-supported languages are:
+
+| language        | recognized names |
+|:--              |:-- |
+| Bash            | bash, sh, shell |
+| C               | c |
+| C++             | cpp, c++ |
+| Djot            | djot |
+| Nix             | nix |
+| Python          | python |
+| Rust            | rust |
+| TypeScript      | typescript,ts, javascript, js |

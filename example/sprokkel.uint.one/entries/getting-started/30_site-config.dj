@@ -1,0 +1,16 @@
+# Site config
+
+Some basic information needs to be configured so your site can be built.
+Sprokkel looks for a file named `sprokkel.toml` at the root of your site's
+directory. The configuration file is as follows:
+
+```toml
+# The site base URL without a trailing slash.
+base-url = "https://example.com"
+# The site base URL for development builds.
+base-url-develop = "http://localhost:8080"
+
+[links]
+# Whether to trim trailing "/index.html" from internal links (default: true)
+# trim-index-html = true
+```

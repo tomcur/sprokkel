@@ -1,0 +1,18 @@
+{% extends "_partials/base.html" %}
+{% block body %}
+<article>
+  <section class="post-content">
+    {{ entry.summary | safe }}
+    {{ entry.rest | safe }}
+  </section>
+  {% if referring_entries %}
+    <hr>
+    This entry is referenced by:
+    <ul>
+      {% for entry in referring_entries %}
+        <li><a href="{{ entry.out_file | path_to_url }}">{{ entry.title }}</a></li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+</article>
+{% endblock %}

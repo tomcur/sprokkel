@@ -1,0 +1,24 @@
+# Entry templates
+
+Entry templates are located in `./templates`. Entry rendering is based on
+[entries' group names](~/entries/10_writing#Groups). For example, given an
+entry belonging to group "blog", Sprokkel will render it according to the
+`_blog.html` template if that template is present. Otherwise, rendering falls
+back to `_entry.html`.
+
+These variables are available in templates during entry rendering:
+
+```typescript
+type EntryTemplateVariables = {
+  // The entry being rendered.
+  entry: Entry;
+  // Entries that link here.
+  referring_entries: Entry[];
+  // All entries in the site, by group.
+  entries: {[group: string]: Entry},
+  // The base URL of the site (e.g., https://example.com)
+  base_url: string;
+}
+```
+
+The [Entry variable is defined here](~/templates/40_entry-variable).

@@ -1,0 +1,44 @@
++++
+[extra]
+hidden = true
++++
+
+# Entry variable
+
+The Entry variable during page rendering is visible in multiple locations.
+
+```typescript
+type Date = {
+  year: number;
+  month: number;
+  day: number;
+}
+
+type Time = {
+  hour: number;
+  minute: number;
+  second: number;
+}
+
+type Entry = {
+  front_matter: Record<string, unknown>;
+  date?: Date;
+  time?: Time;
+  // The group the entry belongs to. E.g, "blog"
+  group: string;
+  // e.g, "some-blog-post"
+  slug: string;
+  // e.g., "blog/2024-04-30T142200_some-blog-post"
+  canonical_name: string;
+  // e.g., `2024/some-blog-post`
+  asset_url: string;
+  // e.g., `2024/some-blog-post.html`
+  permalink: string;
+  // Title of the entry. Equal to the slug if no title is explicitly given. E.g., "Some <em>blog post</em>"
+  title: string;
+  // HTML-render of the entry markup up to the first "-more-", or the entire entry if no "-more-" is present.
+  summary: string;
+  // HTML-render of the remainder of the entry.
+  rest: string;
+}
+```

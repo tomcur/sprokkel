@@ -1,0 +1,19 @@
+# Page templates
+
+Any template in `./templates` where no part of the template path starts with
+an underscore is rendered to the output folder. These templates are useful for
+unique pages on your site, such as an index page, an entry list, or an RSS
+feed. These templates support [pagination](~/templates/30_pagination).
+
+These variables are available in templates during page rendering:
+
+```typescript
+type PageTemplateVariables = {
+  // All entries in the site, by group.
+  entries: {[group: string]: Entry},
+  // The base URL of the site (e.g., https://example.com)
+  base_url: string;
+}
+```
+
+The [Entry variable is defined here](~/templates/40_entry-variable).

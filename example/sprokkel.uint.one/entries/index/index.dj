@@ -1,0 +1,14 @@
+Sprokkel is a lightweight static site generator. It supports:
+
+- writing in [Djot markup](https://github.com/jgm/djot)
+- [Tree-sitter](https://tree-sitter.github.io/tree-sitter)-based code syntax
+  highlighting
+- compile-time LaTeX to to MathML rendering
+- image resizing and re-encoding
+- templating using [minijinja](https://github.com/mitsuhiko/minijinja)
+- pagination
+- static assets
+- back-references: i.e., "which entries link here?"
+
+The goal is to provide some useful abstractions, especially related to file
+paths, while remaining relatively magic-free.

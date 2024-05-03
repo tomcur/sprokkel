@@ -1,0 +1,75 @@
+# Pagination
+
+Sprokkel can automatically paginate. See [the pagination
+test](/pagination-test.html) for an example.
+
+Any [page-template](~/templates/20_page-templates) can be paginated. You
+initiate pagination by calling the `paginate(items, per_page)` function inside
+a template. The first argument to this function must either be a sequence or a
+number, and determines the total number of items you want to paginate. The
+second argument is the number of items to be displayed per page. The template
+will be rendered to the site output once for each page.
+
+The function returns the following map:
+
+```typescript
+type Page = {
+  // The total amount of items to paginate over
+  item_count: number;
+  // The total amount of pages
+  page_count: number;
+  // The page that is currently being rendered
+  current_page: number;
+  // The indices of items in the current page
+  indices: number[];
+  // Whether this is the first page
+  is_first_page: boolean;
+  // Whether this is the last page
+  is_last_page: boolean,
+  // Permalink to the previous page
+  previous?: string;
+  // Permalink to the next page
+  next?: string;
+  // Permalinks to every page
+  page_permalinks: string[];
+}
+```
+
+The `paginate` function does not know what it is paginating over. It only knows
+numbers. Inside the template you fetch the desired items based on the `indices`
+returned by the call to `paginate`.
+
+After calling `paginate` once in a template, subsequent calls in the same
+template simply return the page data. The function arguments no longer have any
+effect---even across pages.
+
+## Example
+
+```jinja2
+{% set p = paginate(entries.blog, 10) %}
+{% for idx in p.indices %}
+  {% set entry = entries.blog[idx] %}
+  <article>
+    <header>
+      <h1><a href="{{ entry.permalink }}">{{ entry.title }}</a></h1>
+    </header>
+    <section class="post-content">
+        {{ entry.summary | safe }}
+    </section>
+  </article>
+{% endfor %}
+```
+
+## Reversing the pages
+
+You may want to reverse the paginated entries, e.g., for a blog where posts are
+sorted by date with the newest posts shown first. You can do that using the
+`reverse` filter:
+
+```jinja2
+{% set p = paginate(entries.blog, 10) %}
+{% for idx in p.indices %}
+  {% set entry = (entries.blog | reverse)[idx] %}
+  ...
+{% endfor %}
+```

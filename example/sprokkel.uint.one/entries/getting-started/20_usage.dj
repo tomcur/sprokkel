@@ -1,0 +1,41 @@
+# Usage
+
+Sprokkel builds output files to `./out`. To build a site for release:
+
+```bash
+$ sprokkel build
+```
+
+To build every time the site changes:
+
+```bash
+$ sprokkel build --watch
+```
+
+Sprokkel generates the site from files in the working directory by default. You
+can specify a different directory: 
+
+```bash
+$ sprokkel build --watch ./path/to/site 
+```
+
+Unless specified otherwise, Sprokkel generates production builds. Only
+explicitly released entries are included in these builds. To let sprokkel
+generate a development build, indicate it using the `--develop` flag, e.g.:
+
+```bash
+$ sprokkel build --develop --watch
+```
+
+Sprokkel does not currently have an HTTP server built in. If you have Python
+available on your development machine, you can use it to serve files:
+
+```bash
+python3 -m http.server 8080 -d ./out
+```
+
+For more CLI information, see:
+
+```bash
+$ sprokkel --help
+```

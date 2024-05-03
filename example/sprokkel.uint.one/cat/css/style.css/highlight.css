@@ -1,0 +1,23 @@
+pre {
+  background-color: var(--bgHighlight);
+  padding: 1em;
+  overflow: auto;
+}
+
+pre code {
+  .keyword, .string.special {
+    font-weight: bold;
+  }
+
+  .comment, .string {
+    color: var(--textHighlight);
+  }
+
+  .comment {
+    font-style: italic;
+  }
+
+  .type {
+    color: var(--textHighlight); font-weight: bold;
+  }
+}

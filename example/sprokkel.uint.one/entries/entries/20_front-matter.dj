@@ -1,0 +1,41 @@
++++
+release = true
+
+[extra]
+numbers = [ 1, 42, 1900 ]
+handy = true
++++
+
+# Front matter
+
+Entries can have front matter by starting the entry with `+++`, followed by a
+TOML document, and ending with `+++` on its own line. YAML is discouraged, but
+is supported for porting old content. To use YAML, enclose the front matter in
+`---` instead.
+
+Front matter can be anything. It is made available in templates under the
+`entry.front_matter` variable. Currently only the `release` key is used by
+Sprokkel, but that may change in the future. To be safe, nest your document
+under `extra`.
+
+## Example
+
+```
++++
+release = true
+
+[extra]
+numbers = [ 1, 42, 1900 ]
+handy = true
++++
+
+# Front matter
+
+...
+```
+
+This makes available:
+
+- `entry.front_matter.release`
+- `entry.front_matter.extra.numbers`
+- `entry.front_matter.extra.handy`

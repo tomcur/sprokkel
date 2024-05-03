@@ -1,0 +1,82 @@
+# Writing entries
+
+Entries are written in the [Djot markup language](https://github.com/jgm/djot).
+
+## Groups
+
+Every entry belongs to a group. Every group can have its own template for
+rendering its entries, and in your site's templates you can enumerate entries
+by group. For example, you may have a group "blog" and a group "pages".
+
+## Directory structure
+
+Sprokkel collects all files that end with the `.dj` file extension in
+`./entries/<group>` directories. Entries can also be placed in their own
+directory to manage [related assets](~/assets/10_static-assets) such as images
+easily; for this case, Sprokkel looks for files named `index.dj` one directory
+deeper.
+
+For example, the following are valid entry locations:
+
+```
+./entries
+├── blog
+│   ├── 2024-03-12-something
+│   │   ├── index.dj
+│   │   └── image.svg
+│   └── 2024-04-24-something-else.dj
+└── pages
+    └── foobar.dj
+```
+
+## Ordering and permalinks
+
+Entries are sorted by their file names. Entries' slugs are equal to their file
+names, but to aid custom ordering, anything up to and including the first
+underscore is dropped. If the part before the underscore can be parsed as a
+date (and optional time), it is used the entry's publish date and time.
+
+| filename | slug | date(+time) |
+|---|---|
+| `2024-03-12_something` | `something` | 2024-03-12 |
+| `2024-04-24_foo-bar` | `foo-bar` | 2024-04-24 |
+| `2024-04-24_foo-baz` | `foo-baz` | 2024-04-24 |
+| `2024-04-24T122400_with-a-time` | `with-a-time` | 2024-04-24T12:24:00 |
+| `something-else-entirely` | `something-else-entirely` |---|
+
+The date format is `YYYY-MM-DD`. The date plus time format is
+`YYYY-MM-DDThhmmss`. Time zones are not supported to ensure the lexicographical
+ordering of entries' file names is equal to their chronological order of date
+and times. Consider hardcoding a specific timezone in the
+[template](~/templates/10_entry-templates) instead.
+
+## Titles
+
+If an entry starts with a level-1 heading, it is used as the entry's title. For
+example, the following entry has title "Foo _bar_". If no title is given, the
+slug is used as the entry's title.
+
+```djot
+# Foo _bar_
+
+Lorem ipsum...
+```
+
+## Front matter
+
+To customize some behavior and meta-information related to entries, use [front
+matter](~/entries/20_front-matter).
+
+## Links
+
+You can link between entries using their file names (without extensions).
+Sprokkel rewrites such links to the absolute URL of the target entry. For
+example:
+
+
+```djot
+In a [previous post](~/blog/2024-04-10_previous_post), ...
+```
+
+These internals links are recorded as a back-references in links' target
+entries, and available in [templates](~/templates/10_entry-templates).

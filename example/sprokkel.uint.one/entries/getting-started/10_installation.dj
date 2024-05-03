@@ -1,0 +1,24 @@
++++
+release = "true"
++++
+
+# Installation
+
+It is unlikely Sprokkel is packaged by your OS distribution.
+
+You can install it using Cargo:
+
+```bash
+$ cargo install sprokkel
+
+# With katex-based LaTeX to MathML rendering
+$ cargo install sprokkel --features katex
+
+$ sprokkel --help
+```
+
+Or use the provided [Nix](https://nixos.org) flake:
+
+```bash
+$ nix run .# -- --help
+```

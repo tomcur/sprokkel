@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, shrink-to-fit=no"
+    />
+    <meta name="author" content="Tom Churchman" />
+    <link rel="preload stylesheet" as="style" href="{{ "css/style.css" | path_to_url }}" />
+    <link rel="icon" href="/emoji_u1f54a.svg">
+    <script defer src="{{ "js/main.js" | path_to_url }}"></script>
+    <title>{% block title %}Sprokkel /'sprɔkəl/{% endblock %}</title>
+    {% block extrahead %}{% endblock %}
+  </head>
+  <body>
+    <header class="site-header" role="banner">
+        <div class="header-home">
+          <a href="{{ base_url }}">Home</a>
+        </div>
+      <div class="header-logo">
+          Sprokkel <img alt="dove emoji" src="/emoji_u1f54a.svg" /><br>
+          /'sprɔkəl/
+      </div>
+      <nav class="header-menu">
+        <div>
+          <button id="color-scheme-toggle">
+            <span class="dark">🌖</span>
+            <span class="light">🌘</span>
+          </button>
+        </div>
+      </nav>
+    </header>
+    <section>
+      <nav>
+        <ul>
+          <li>
+            <header>Getting started</header>
+            <ul>
+              {% for entry in entries["getting-started"] %}
+                <li><a href="{{ entry.permalink }}">{{ entry.title }}</a></li>
+              {% endfor %}
+            </ul>
+          </li>
+          <li>
+            <header>Entries</header>
+            <ul>
+              {% for entry in entries.entries %}
+                <li><a href="{{ entry.permalink }}">{{ entry.title }}</a></li>
+              {% endfor %}
+            </ul>
+          </li>
+          <li>
+            <header>Templates</header>
+            <ul>
+              {% for entry in entries.templates %}
+                {% if not entry.front_matter.extra.hidden %}
+                  <li><a href="{{ entry.permalink }}">{{ entry.title }}</a></li>
+                {% endif %}
+              {% endfor %}
+            </ul>
+          </li>
+          <li>
+            <header>Assets</header>
+            <ul>
+              {% for entry in entries.assets %}
+                <li><a href="{{ entry.permalink }}">{{ entry.title }}</a></li>
+              {% endfor %}
+            </ul>
+          </li>
+        </ul>
+      </nav>
+    <main>{% block body %}{% endblock %}</main>
+    </section>
+    <footer class="site-footer">
+      <div class="footer-logo">Sprokkel <img alt="dove emoji" src="/emoji_u1f54a.svg" /></div>
+      <div></div>
+      <div class="footer-menu">
+        <div>
+          <a href="https://github.com/tomcur/sprokkel">GitHub</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
+

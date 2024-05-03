@@ -1,0 +1,5 @@
+base-url = "https://sprokkel.uint.one"
+base-url-develop = "http://localhost:8080"
+
+[links]
+# trim-index-html = true
