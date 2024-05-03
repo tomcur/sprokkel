@@ -102,6 +102,12 @@ fn init_configurations() -> Box<Configurations> {
     }));
     rust_config.configure(HIGHLIGHT_NAMES);
 
+    let toml_config = Box::leak::<'static>(Box::new({
+        let highlights = tree_sitter_toml::HIGHLIGHT_QUERY;
+        HighlightConfiguration::new(tree_sitter_toml::language(), &highlights, "", "").unwrap()
+    }));
+    toml_config.configure(HIGHLIGHT_NAMES);
+
     let typescript_config = Box::leak::<'static>(Box::new({
         let highlights: String = [
             tree_sitter_javascript::HIGHLIGHT_QUERY,
@@ -133,6 +139,7 @@ fn init_configurations() -> Box<Configurations> {
         "nix" => Some(nix_config as &'static _),
         "python" => Some(python_config as &'static _),
         "rust" => Some(rust_config as &'static _),
+        "toml" => Some(toml_config as &'static _),
         "typescript" | "ts" | "javascript" | "js" => Some(typescript_config as &'static _),
         _ => None,
     };

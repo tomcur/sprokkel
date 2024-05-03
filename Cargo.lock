@@ -1369,6 +1369,7 @@ dependencies = [
  "tree-sitter-nix",
  "tree-sitter-python",
  "tree-sitter-rust",
+ "tree-sitter-toml",
  "tree-sitter-typescript",
  "walkdir",
 ]
@@ -1628,6 +1629,16 @@ name = "tree-sitter-rust"
 version = "0.20.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b0832309b0b2b6d33760ce5c0e818cb47e1d72b468516bfe4134408926fa7594"
+dependencies = [
+ "cc",
+ "tree-sitter",
+]
+
+[[package]]
+name = "tree-sitter-toml"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ca517f578a98b23d20780247cc2688407fa81effad5b627a5a364ec3339b53e8"
 dependencies = [
  "cc",
  "tree-sitter",
