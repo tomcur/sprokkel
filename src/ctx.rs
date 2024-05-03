@@ -25,7 +25,7 @@ impl Ctx {
             inner: Arc::new(InnerCtx {
                 build_kind,
                 base_url: base_url.clone(),
-                trim_index_html: site_config.trim_index_html.unwrap_or(true),
+                trim_index_html: site_config.links.trim_index_html.unwrap_or(true),
             }),
         }
     }
@@ -59,7 +59,9 @@ mod test {
             r#"
                 base-url = "http://localhost:8080"
                 base-url-develop = ".."
-                trim-url-index = true
+
+                [links]
+                trim-index-html = true
             "#,
         )
         .unwrap();
