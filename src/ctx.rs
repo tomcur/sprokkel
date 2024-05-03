@@ -5,6 +5,7 @@ use crate::{cli::BuildKind, config::SiteConfig, utils};
 struct InnerCtx {
     build_kind: BuildKind,
     base_url: String,
+    trim_index_html: bool,
 }
 
 /// Site build context. The context is cheap to clone.
@@ -24,6 +25,7 @@ impl Ctx {
             inner: Arc::new(InnerCtx {
                 build_kind,
                 base_url: base_url.clone(),
+                trim_index_html: site_config.trim_index_html.unwrap_or(true),
             }),
         }
     }
@@ -39,7 +41,7 @@ impl Ctx {
     /// Turn a path relative to the output directory into an absolute URL.
     pub fn path_to_absolute_url(&self, path: impl AsRef<Path>) -> anyhow::Result<String> {
         let mut url = utils::path_to_url(Some(self.base_url()), path)?;
-        if url.ends_with("/index.html") {
+        if self.inner.trim_index_html && url.ends_with("/index.html") {
             url.truncate(url.len() - "/index.html".len());
         }
         Ok(url)

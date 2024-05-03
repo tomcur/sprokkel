@@ -3,4 +3,5 @@
 pub struct SiteConfig {
     pub base_url: String,
     pub base_url_develop: String,
+    pub trim_index_html: Option<bool>,
 }
