@@ -190,8 +190,7 @@ fn build(ctx: &Ctx, path: &Path, renderer: &render::Renderer) -> anyhow::Result<
         let mut front_matter = front_matter;
 
         for idx in (0..entries.len()).rev() {
-            // if front_matter[idx].released.unwrap_or(false) {
-            if front_matter[idx].released {
+            if front_matter[idx].released.unwrap_or(true) {
                 continue;
             }
 

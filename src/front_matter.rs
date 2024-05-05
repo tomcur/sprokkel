@@ -22,13 +22,14 @@ pub fn parse_front_matter(content: &str) -> anyhow::Result<(types::FrontMatter, 
 
     let mut front_matter = types::FrontMatter {
         title: String::new(),
-        released: false,
+        released: None,
         extra: parsed.unwrap_or_else(|| HashMap::new()),
     };
 
     let extra = &front_matter.extra;
     if let Some(release) = extra.get("release") {
-        front_matter.released = matches!(release.as_str(), Some("true" | "yes"));
+        front_matter.released =
+            Some(release.is_true() || matches!(release.as_str(), Some("true" | "yes")));
     }
 
     Ok((front_matter, rest))

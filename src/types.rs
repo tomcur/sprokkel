@@ -141,7 +141,7 @@ pub struct EntryMetaAndFrontMatter<'m> {
 #[derive(Debug, serde::Serialize)]
 pub struct FrontMatter {
     pub title: String,
-    pub released: bool,
+    pub released: Option<bool>,
     #[serde(rename(serialize = "front_matter"))]
     pub extra: HashMap<String, minijinja::value::Value>,
 }
