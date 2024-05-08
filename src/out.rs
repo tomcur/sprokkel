@@ -113,7 +113,7 @@ impl Out {
             if entry.file_type().is_dir() {
                 let target = self.prefix.join(target);
                 fs::create_dir_all(target)?;
-            } else {
+            } else if entry.file_type().is_file() {
                 self.copy_file(entry.path(), target)?;
             }
         }
