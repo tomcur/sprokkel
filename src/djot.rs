@@ -104,443 +104,428 @@ pub fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterato
     genawaiter::rc::Gen::new(|co| async move {
         while let Some(ev) = djot.next() {
             match ev {
-                Event::Start(container, attributes) => {
-                    match container {
-                        Container::Blockquote => {
-                            co.yield_(IrEvent::Start {
-                                container: IrContainer::Blockquote,
-                                attributes,
-                            })
-                            .await
-                        }
-
-                        Container::DescriptionList => {
-                            co.yield_(IrEvent::Start {
-                                container: IrContainer::DescriptionList,
-                                attributes,
-                            })
-                            .await
-                        }
-                        Container::DescriptionTerm => {
-                            co.yield_(IrEvent::Start {
-                                container: IrContainer::DescriptionTerm,
-                                attributes,
-                            })
-                            .await
-                        }
-                        Container::DescriptionDetails => {
-                            co.yield_(IrEvent::Start {
-                                container: IrContainer::DescriptionDetails,
-                                attributes,
-                            })
-                            .await
-                        }
-
-                        Container::Heading {
-                            level,
-                            has_section: _,
-                            id,
-                        } => {
-                            co.yield_(IrEvent::Start {
-                                container: IrContainer::Heading { level, id },
-                                attributes,
-                            })
-                            .await
-                        }
-                        Container::Section { id } => {
-                            co.yield_(IrEvent::Start {
-                                container: IrContainer::Section { id },
-                                attributes,
-                            })
-                            .await
-                        }
-                        Container::Div { class: _ } => {
-                            co.yield_(IrEvent::Start {
-                                container: IrContainer::Div,
-                                attributes,
-                            })
-                            .await
-                        }
-                        Container::Paragraph => {
-                            co.yield_(IrEvent::Start {
-                                container: IrContainer::Paragraph,
-                                attributes,
-                            })
-                            .await
-                        }
-                        Container::Image(destination, _link_type) => {
-                            let alt = render_to_raw_string(iter_container_from_inside(&mut djot));
-                            co.yield_(IrEvent::Image {
-                                destination,
-                                alt,
-                                attributes,
-                            })
-                            .await
-                        }
-                        Container::Link(destination, _link_type) => {
-                            co.yield_(IrEvent::Start {
-                                container: IrContainer::Link { destination },
-                                attributes,
-                            })
-                            .await
-                        }
-
-                        Container::CodeBlock { language } => {
-                            let code = render_to_raw_string(iter_container_from_inside(&mut djot));
-                            co.yield_(IrEvent::CodeBlock {
-                                language: language.into(),
-                                code,
-                                attributes,
-                            })
-                            .await
-                        }
-                        Container::Math { display } => {
-                            let math = render_to_raw_string(iter_container_from_inside(&mut djot));
-                            co.yield_(IrEvent::Math {
-                                kind: if display {
-                                    IrMathKind::Display
-                                } else {
-                                    IrMathKind::Inline
-                                },
-                                math,
-                                attributes,
-                            })
-                            .await
-                        }
-
-                        Container::RawInline { format } => {
-                            let content = render_to_raw_string(iter_container_from_inside(&mut djot));
-                            if matches!(format, "html" | "HTML") {
-                                co.yield_(IrEvent::HtmlInline { content, attributes }).await
-                            }
-                        }
-                        Container::RawBlock { format } => {
-                            let content = render_to_raw_string(iter_container_from_inside(&mut djot));
-                            if matches!(format, "html" | "HTML") {
-                                co.yield_(IrEvent::HtmlBlock { content, attributes }).await
-                            }
-                        }
-
-                        Container::List { kind, tight } => {
-                            co.yield_(IrEvent::Start {
-                                container: IrContainer::List {
-                                    kind: kind.into(),
-                                    tight,
-                                },
-                                attributes,
-                            })
-                            .await
-                        }
-                        Container::ListItem => {
-                            co.yield_(IrEvent::Start {
-                                container: IrContainer::ListItem,
-                                attributes,
-                            })
-                            .await
-                        }
-                        Container::TaskListItem { checked } => {
-                            co.yield_(IrEvent::Start {
-                                container: IrContainer::TaskListItem { checked },
-                                attributes,
-                            })
-                            .await
-                        }
-
-                        Container::Table => {
-                            co.yield_(IrEvent::Start {
-                                container: IrContainer::Table,
-                                attributes,
-                            })
-                            .await;
-                            co.yield_(IrEvent::Start {
-                                container: IrContainer::TableBody,
-                                attributes: jotdown::Attributes::new(),
-                            })
-                            .await;
-                        }
-                        Container::TableRow { head: _ } => {
-                            co.yield_(IrEvent::Start {
-                                container: IrContainer::TableRow,
-                                attributes,
-                            })
-                            .await
-                        }
-                        Container::TableCell { alignment, head } => {
-                            co.yield_(IrEvent::Start {
-                                container: IrContainer::TableCell {
-                                    alignment: alignment.into(),
-                                    head,
-                                },
-                                attributes,
-                            })
-                            .await
-                        }
-
-                        Container::Footnote { label } => {
-                            co.yield_(IrEvent::Start {
-                                container: IrContainer::Footnote { label: label.into() },
-                                attributes,
-                            })
-                            .await
-                        }
-                        Container::LinkDefinition { label: _ } => {}
-
-                        Container::Caption => {
-                            co.yield_(IrEvent::Start {
-                                container: IrContainer::Other { tag: "caption".into() },
-                                attributes,
-                            })
-                            .await
-                        }
-                        Container::Verbatim => {
-                            co.yield_(IrEvent::Start {
-                                container: IrContainer::Other { tag: "code".into() },
-                                attributes,
-                            })
-                            .await
-                        }
-                        Container::Span => {
-                            co.yield_(IrEvent::Start {
-                                container: IrContainer::Other { tag: "span".into() },
-                                attributes,
-                            })
-                            .await
-                        }
-                        Container::Subscript => {
-                            co.yield_(IrEvent::Start {
-                                container: IrContainer::Other { tag: "sub".into() },
-                                attributes,
-                            })
-                            .await
-                        }
-                        Container::Superscript => {
-                            co.yield_(IrEvent::Start {
-                                container: IrContainer::Other { tag: "sup".into() },
-                                attributes,
-                            })
-                            .await
-                        }
-                        Container::Insert => {
-                            co.yield_(IrEvent::Start {
-                                container: IrContainer::Other { tag: "ins".into() },
-                                attributes,
-                            })
-                            .await
-                        }
-                        Container::Delete => {
-                            co.yield_(IrEvent::Start {
-                                container: IrContainer::Other { tag: "del".into() },
-                                attributes,
-                            })
-                            .await
-                        }
-                        Container::Strong => {
-                            co.yield_(IrEvent::Start {
-                                container: IrContainer::Other { tag: "strong".into() },
-                                attributes,
-                            })
-                            .await
-                        }
-                        Container::Emphasis => {
-                            co.yield_(IrEvent::Start {
-                                container: IrContainer::Other { tag: "em".into() },
-                                attributes,
-                            })
-                            .await
-                        }
-                        Container::Mark => {
-                            co.yield_(IrEvent::Start {
-                                container: IrContainer::Other { tag: "mark".into() },
-                                attributes,
-                            })
-                            .await
-                        }
-                    };
+                Event::Start(Container::Blockquote, attributes) => {
+                    co.yield_(IrEvent::Start {
+                        container: IrContainer::Blockquote,
+                        attributes,
+                    })
+                    .await
                 }
-                Event::End(container) => {
-                    match container {
-                        Container::Blockquote => {
-                            co.yield_(IrEvent::End {
-                                container: IrContainerEnd::Blockquote,
-                            })
-                            .await
-                        }
+                Event::End(Container::Blockquote) => {
+                    co.yield_(IrEvent::End {
+                        container: IrContainerEnd::Blockquote,
+                    })
+                    .await
+                }
 
-                        Container::DescriptionList => {
-                            co.yield_(IrEvent::End {
-                                container: IrContainerEnd::DescriptionList,
-                            })
-                            .await
-                        }
-                        Container::DescriptionTerm => {
-                            co.yield_(IrEvent::End {
-                                container: IrContainerEnd::DescriptionTerm,
-                            })
-                            .await
-                        }
-                        Container::DescriptionDetails => {
-                            co.yield_(IrEvent::End {
-                                container: IrContainerEnd::DescriptionDetails,
-                            })
-                            .await
-                        }
+                Event::Start(Container::DescriptionList, attributes) => {
+                    co.yield_(IrEvent::Start {
+                        container: IrContainer::DescriptionList,
+                        attributes,
+                    })
+                    .await
+                }
+                Event::End(Container::DescriptionList) => {
+                    co.yield_(IrEvent::End {
+                        container: IrContainerEnd::DescriptionList,
+                    })
+                    .await
+                }
+                Event::Start(Container::DescriptionTerm, attributes) => {
+                    co.yield_(IrEvent::Start {
+                        container: IrContainer::DescriptionTerm,
+                        attributes,
+                    })
+                    .await
+                }
+                Event::End(Container::DescriptionTerm) => {
+                    co.yield_(IrEvent::End {
+                        container: IrContainerEnd::DescriptionTerm,
+                    })
+                    .await
+                }
+                Event::Start(Container::DescriptionDetails, attributes) => {
+                    co.yield_(IrEvent::Start {
+                        container: IrContainer::DescriptionDetails,
+                        attributes,
+                    })
+                    .await
+                }
+                Event::End(Container::DescriptionDetails) => {
+                    co.yield_(IrEvent::End {
+                        container: IrContainerEnd::DescriptionDetails,
+                    })
+                    .await
+                }
 
-                        Container::Heading {
-                            level,
-                            has_section: _,
-                            id: _,
-                        } => {
-                            co.yield_(IrEvent::End {
-                                container: IrContainerEnd::Heading { level },
-                            })
-                            .await
-                        }
-                        Container::Section { id: _ } => {
-                            co.yield_(IrEvent::End {
-                                container: IrContainerEnd::Section,
-                            })
-                            .await
-                        }
-                        Container::Div { class: _ } => {
-                            co.yield_(IrEvent::End {
-                                container: IrContainerEnd::Div,
-                            })
-                            .await
-                        }
-                        Container::Paragraph => {
-                            co.yield_(IrEvent::End {
-                                container: IrContainerEnd::Paragraph,
-                            })
-                            .await
-                        }
-                        Container::Image(_, _) => {
-                            // image start consumes image end
-                            unreachable!()
-                        }
+                Event::Start(
+                    Container::Heading {
+                        level,
+                        has_section: _,
+                        id,
+                    },
+                    attributes,
+                ) => {
+                    co.yield_(IrEvent::Start {
+                        container: IrContainer::Heading { level, id },
+                        attributes,
+                    })
+                    .await
+                }
+                Event::End(Container::Heading {
+                    level,
+                    has_section: _,
+                    id: _,
+                }) => {
+                    co.yield_(IrEvent::End {
+                        container: IrContainerEnd::Heading { level },
+                    })
+                    .await
+                }
+                Event::Start(Container::Section { id }, attributes) => {
+                    co.yield_(IrEvent::Start {
+                        container: IrContainer::Section { id },
+                        attributes,
+                    })
+                    .await
+                }
+                Event::End(Container::Section { id: _ }) => {
+                    co.yield_(IrEvent::End {
+                        container: IrContainerEnd::Section,
+                    })
+                    .await
+                }
+                Event::Start(Container::Div { class: _ }, attributes) => {
+                    co.yield_(IrEvent::Start {
+                        container: IrContainer::Div,
+                        attributes,
+                    })
+                    .await
+                }
+                Event::End(Container::Div { class: _ }) => {
+                    co.yield_(IrEvent::End {
+                        container: IrContainerEnd::Div,
+                    })
+                    .await
+                }
+                Event::Start(Container::Paragraph, attributes) => {
+                    co.yield_(IrEvent::Start {
+                        container: IrContainer::Paragraph,
+                        attributes,
+                    })
+                    .await
+                }
+                Event::End(Container::Paragraph) => {
+                    co.yield_(IrEvent::End {
+                        container: IrContainerEnd::Paragraph,
+                    })
+                    .await
+                }
+                Event::Start(Container::Image(destination, _link_type), attributes) => {
+                    let alt = render_to_raw_string(iter_container_from_inside(&mut djot));
+                    co.yield_(IrEvent::Image {
+                        destination,
+                        alt,
+                        attributes,
+                    })
+                    .await
+                }
+                Event::End(Container::Image(_, _)) => unreachable!(),
+                Event::Start(Container::Link(destination, _link_type), attributes) => {
+                    co.yield_(IrEvent::Start {
+                        container: IrContainer::Link { destination },
+                        attributes,
+                    })
+                    .await
+                }
+                Event::End(Container::Link(_, _)) => {
+                    co.yield_(IrEvent::End {
+                        container: IrContainerEnd::Link,
+                    })
+                    .await
+                }
 
-                        Container::Link(_, _) => {
-                            co.yield_(IrEvent::End {
-                                container: IrContainerEnd::Link,
-                            })
-                            .await
-                        }
+                Event::Start(Container::CodeBlock { language }, attributes) => {
+                    let code = render_to_raw_string(iter_container_from_inside(&mut djot));
+                    co.yield_(IrEvent::CodeBlock {
+                        language: language.into(),
+                        code,
+                        attributes,
+                    })
+                    .await
+                }
+                Event::End(Container::CodeBlock { .. }) => unreachable!(),
+                Event::Start(Container::Math { display }, attributes) => {
+                    let math = render_to_raw_string(iter_container_from_inside(&mut djot));
+                    co.yield_(IrEvent::Math {
+                        kind: if display {
+                            IrMathKind::Display
+                        } else {
+                            IrMathKind::Inline
+                        },
+                        math,
+                        attributes,
+                    })
+                    .await
+                }
+                Event::End(Container::Math { .. }) => unreachable!(),
 
-                        Container::List { kind, tight: _ } => {
-                            co.yield_(IrEvent::End {
-                                container: IrContainerEnd::List { kind: kind.into() },
-                            })
-                            .await
-                        }
-                        Container::ListItem => {
-                            co.yield_(IrEvent::End {
-                                container: IrContainerEnd::ListItem,
-                            })
-                            .await
-                        }
-                        Container::TaskListItem { checked: _ } => {
-                            co.yield_(IrEvent::End {
-                                container: IrContainerEnd::TaskListItem,
-                            })
-                            .await
-                        }
+                Event::Start(Container::RawInline { format }, attributes) => {
+                    let content = render_to_raw_string(iter_container_from_inside(&mut djot));
+                    if matches!(format, "html" | "HTML") {
+                        co.yield_(IrEvent::HtmlInline { content, attributes }).await
+                    }
+                }
+                Event::End(Container::RawInline { .. }) => unreachable!(),
+                Event::Start(Container::RawBlock { format }, attributes) => {
+                    let content = render_to_raw_string(iter_container_from_inside(&mut djot));
+                    if matches!(format, "html" | "HTML") {
+                        co.yield_(IrEvent::HtmlBlock { content, attributes }).await
+                    }
+                }
+                Event::End(Container::RawBlock { .. }) => unreachable!(),
 
-                        Container::Table => {
-                            co.yield_(IrEvent::End {
-                                container: IrContainerEnd::TableBody,
-                            })
-                            .await;
-                            co.yield_(IrEvent::End {
-                                container: IrContainerEnd::Table,
-                            })
-                            .await;
-                        }
-                        Container::TableRow { head: _ } => {
-                            co.yield_(IrEvent::End {
-                                container: IrContainerEnd::TableRow,
-                            })
-                            .await
-                        }
-                        Container::TableCell { alignment: _, head } => {
-                            co.yield_(IrEvent::End {
-                                container: IrContainerEnd::TableCell { head },
-                            })
-                            .await
-                        }
+                Event::Start(Container::List { kind, tight }, attributes) => {
+                    co.yield_(IrEvent::Start {
+                        container: IrContainer::List {
+                            kind: kind.into(),
+                            tight,
+                        },
+                        attributes,
+                    })
+                    .await
+                }
+                Event::End(Container::List { kind, tight: _ }) => {
+                    co.yield_(IrEvent::End {
+                        container: IrContainerEnd::List { kind: kind.into() },
+                    })
+                    .await
+                }
+                Event::Start(Container::ListItem, attributes) => {
+                    co.yield_(IrEvent::Start {
+                        container: IrContainer::ListItem,
+                        attributes,
+                    })
+                    .await
+                }
+                Event::End(Container::ListItem) => {
+                    co.yield_(IrEvent::End {
+                        container: IrContainerEnd::ListItem,
+                    })
+                    .await
+                }
+                Event::Start(Container::TaskListItem { checked }, attributes) => {
+                    co.yield_(IrEvent::Start {
+                        container: IrContainer::TaskListItem { checked },
+                        attributes,
+                    })
+                    .await
+                }
+                Event::End(Container::TaskListItem { checked: _ }) => {
+                    co.yield_(IrEvent::End {
+                        container: IrContainerEnd::TaskListItem,
+                    })
+                    .await
+                }
 
-                        Container::Caption => {
-                            co.yield_(IrEvent::End {
-                                container: IrContainerEnd::Other { tag: "caption".into() },
-                            })
-                            .await
-                        }
-                        Container::Verbatim => {
-                            co.yield_(IrEvent::End {
-                                container: IrContainerEnd::Other { tag: "code".into() },
-                            })
-                            .await
-                        }
-                        Container::Span => {
-                            co.yield_(IrEvent::End {
-                                container: IrContainerEnd::Other { tag: "span".into() },
-                            })
-                            .await
-                        }
-                        Container::Subscript => {
-                            co.yield_(IrEvent::End {
-                                container: IrContainerEnd::Other { tag: "sub".into() },
-                            })
-                            .await
-                        }
-                        Container::Superscript => {
-                            co.yield_(IrEvent::End {
-                                container: IrContainerEnd::Other { tag: "sup".into() },
-                            })
-                            .await
-                        }
-                        Container::Insert => {
-                            co.yield_(IrEvent::End {
-                                container: IrContainerEnd::Other { tag: "ins".into() },
-                            })
-                            .await
-                        }
-                        Container::Delete => {
-                            co.yield_(IrEvent::End {
-                                container: IrContainerEnd::Other { tag: "del".into() },
-                            })
-                            .await
-                        }
-                        Container::Strong => {
-                            co.yield_(IrEvent::End {
-                                container: IrContainerEnd::Other { tag: "strong".into() },
-                            })
-                            .await
-                        }
-                        Container::Emphasis => {
-                            co.yield_(IrEvent::End {
-                                container: IrContainerEnd::Other { tag: "em".into() },
-                            })
-                            .await
-                        }
-                        Container::Mark => {
-                            co.yield_(IrEvent::End {
-                                container: IrContainerEnd::Other { tag: "mark".into() },
-                            })
-                            .await
-                        }
+                Event::Start(Container::Table, attributes) => {
+                    co.yield_(IrEvent::Start {
+                        container: IrContainer::Table,
+                        attributes,
+                    })
+                    .await;
+                    co.yield_(IrEvent::Start {
+                        container: IrContainer::TableBody,
+                        attributes: jotdown::Attributes::new(),
+                    })
+                    .await;
+                }
+                Event::End(Container::Table) => {
+                    co.yield_(IrEvent::End {
+                        container: IrContainerEnd::TableBody,
+                    })
+                    .await;
+                    co.yield_(IrEvent::End {
+                        container: IrContainerEnd::Table,
+                    })
+                    .await;
+                }
+                Event::Start(Container::TableRow { head: _ }, attributes) => {
+                    co.yield_(IrEvent::Start {
+                        container: IrContainer::TableRow,
+                        attributes,
+                    })
+                    .await
+                }
+                Event::End(Container::TableRow { head: _ }) => {
+                    co.yield_(IrEvent::End {
+                        container: IrContainerEnd::TableRow,
+                    })
+                    .await
+                }
+                Event::Start(Container::TableCell { alignment, head }, attributes) => {
+                    co.yield_(IrEvent::Start {
+                        container: IrContainer::TableCell {
+                            alignment: alignment.into(),
+                            head,
+                        },
+                        attributes,
+                    })
+                    .await
+                }
+                Event::End(Container::TableCell { alignment: _, head }) => {
+                    co.yield_(IrEvent::End {
+                        container: IrContainerEnd::TableCell { head },
+                    })
+                    .await
+                }
 
-                        Container::Footnote { label: _ } => {
-                            co.yield_(IrEvent::End {
-                                container: IrContainerEnd::Footnote,
-                            })
-                            .await
-                        }
+                Event::Start(Container::Footnote { label }, attributes) => {
+                    co.yield_(IrEvent::Start {
+                        container: IrContainer::Footnote { label: label.into() },
+                        attributes,
+                    })
+                    .await
+                }
+                Event::End(Container::Footnote { label: _ }) => {
+                    co.yield_(IrEvent::End {
+                        container: IrContainerEnd::Footnote,
+                    })
+                    .await
+                }
 
-                        Container::LinkDefinition { label: _ } => {}
-                        Container::CodeBlock { .. } => unreachable!(),
-                        Container::Math { .. } => unreachable!(),
-                        Container::RawBlock { .. } => unreachable!(),
-                        Container::RawInline { .. } => unreachable!(),
-                    };
+                Event::Start(Container::LinkDefinition { label: _ }, _attributes) => {}
+                Event::End(Container::LinkDefinition { label: _ }) => {}
+
+                Event::Start(Container::Caption, attributes) => {
+                    co.yield_(IrEvent::Start {
+                        container: IrContainer::Other { tag: "caption".into() },
+                        attributes,
+                    })
+                    .await
+                }
+                Event::End(Container::Caption) => {
+                    co.yield_(IrEvent::End {
+                        container: IrContainerEnd::Other { tag: "caption".into() },
+                    })
+                    .await
+                }
+                Event::Start(Container::Verbatim, attributes) => {
+                    co.yield_(IrEvent::Start {
+                        container: IrContainer::Other { tag: "code".into() },
+                        attributes,
+                    })
+                    .await
+                }
+                Event::End(Container::Verbatim) => {
+                    co.yield_(IrEvent::End {
+                        container: IrContainerEnd::Other { tag: "code".into() },
+                    })
+                    .await
+                }
+                Event::Start(Container::Span, attributes) => {
+                    co.yield_(IrEvent::Start {
+                        container: IrContainer::Other { tag: "span".into() },
+                        attributes,
+                    })
+                    .await
+                }
+                Event::End(Container::Span) => {
+                    co.yield_(IrEvent::End {
+                        container: IrContainerEnd::Other { tag: "span".into() },
+                    })
+                    .await
+                }
+                Event::Start(Container::Subscript, attributes) => {
+                    co.yield_(IrEvent::Start {
+                        container: IrContainer::Other { tag: "sub".into() },
+                        attributes,
+                    })
+                    .await
+                }
+                Event::End(Container::Subscript) => {
+                    co.yield_(IrEvent::End {
+                        container: IrContainerEnd::Other { tag: "sub".into() },
+                    })
+                    .await
+                }
+                Event::Start(Container::Superscript, attributes) => {
+                    co.yield_(IrEvent::Start {
+                        container: IrContainer::Other { tag: "sup".into() },
+                        attributes,
+                    })
+                    .await
+                }
+                Event::End(Container::Superscript) => {
+                    co.yield_(IrEvent::End {
+                        container: IrContainerEnd::Other { tag: "sup".into() },
+                    })
+                    .await
+                }
+                Event::Start(Container::Insert, attributes) => {
+                    co.yield_(IrEvent::Start {
+                        container: IrContainer::Other { tag: "ins".into() },
+                        attributes,
+                    })
+                    .await
+                }
+                Event::End(Container::Insert) => {
+                    co.yield_(IrEvent::End {
+                        container: IrContainerEnd::Other { tag: "ins".into() },
+                    })
+                    .await
+                }
+                Event::Start(Container::Delete, attributes) => {
+                    co.yield_(IrEvent::Start {
+                        container: IrContainer::Other { tag: "del".into() },
+                        attributes,
+                    })
+                    .await
+                }
+                Event::End(Container::Delete) => {
+                    co.yield_(IrEvent::End {
+                        container: IrContainerEnd::Other { tag: "del".into() },
+                    })
+                    .await
+                }
+                Event::Start(Container::Strong, attributes) => {
+                    co.yield_(IrEvent::Start {
+                        container: IrContainer::Other { tag: "strong".into() },
+                        attributes,
+                    })
+                    .await
+                }
+                Event::End(Container::Strong) => {
+                    co.yield_(IrEvent::End {
+                        container: IrContainerEnd::Other { tag: "strong".into() },
+                    })
+                    .await
+                }
+                Event::Start(Container::Emphasis, attributes) => {
+                    co.yield_(IrEvent::Start {
+                        container: IrContainer::Other { tag: "em".into() },
+                        attributes,
+                    })
+                    .await
+                }
+                Event::End(Container::Emphasis) => {
+                    co.yield_(IrEvent::End {
+                        container: IrContainerEnd::Other { tag: "em".into() },
+                    })
+                    .await
+                }
+                Event::Start(Container::Mark, attributes) => {
+                    co.yield_(IrEvent::Start {
+                        container: IrContainer::Other { tag: "mark".into() },
+                        attributes,
+                    })
+                    .await
+                }
+                Event::End(Container::Mark) => {
+                    co.yield_(IrEvent::End {
+                        container: IrContainerEnd::Other { tag: "mark".into() },
+                    })
+                    .await
                 }
 
                 Event::Str(str) | Event::Symbol(str) => co.yield_(IrEvent::Str(str)).await,
