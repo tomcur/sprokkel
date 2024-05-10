@@ -1,5 +1,5 @@
 {
-  description = "Sprokkel - A lightweight static site generator";
+  description = "A lightweight static site generator";
   inputs = {
     flake-utils.url = "github:numtide/flake-utils";
     flake-compat = {
