@@ -15,6 +15,7 @@ mod djot;
 mod front_matter;
 mod highlight;
 mod images;
+mod ir_markup;
 mod out;
 mod render;
 mod types;
@@ -60,21 +61,14 @@ fn collect_entries<'a>(
                 if entry.file_type().is_dir() || !name.ends_with(".dj") {
                     None
                 } else {
-                    Some(types::EntryMeta::entry_from_path(
-                        ctx,
-                        path_prefix,
-                        entry.path(),
-                    ))
+                    Some(types::EntryMeta::entry_from_path(ctx, path_prefix, entry.path()))
                 }
             }
             Err(err) => Some(Err(err.into())),
         })
 }
 
-fn collect_entry_groups(
-    ctx: &Ctx,
-    path: impl AsRef<Path>,
-) -> anyhow::Result<(Vec<Group>, Vec<types::EntryMeta>)> {
+fn collect_entry_groups(ctx: &Ctx, path: impl AsRef<Path>) -> anyhow::Result<(Vec<Group>, Vec<types::EntryMeta>)> {
     let path = path.as_ref();
     let mut entries = vec![];
     let mut groups = vec![];
@@ -117,11 +111,7 @@ fn build(ctx: &Ctx, path: &Path, renderer: &render::Renderer) -> anyhow::Result<
 
     log::info!("Found {} entry group(s):", groups.len());
     for group in groups.iter() {
-        log::info!(
-            "  entries in group \"{}\": {}",
-            group.name,
-            group.range.len()
-        );
+        log::info!("  entries in group \"{}\": {}", group.name, group.range.len());
     }
 
     // This reads all entries' file contents into memory. Fine for now.
@@ -148,23 +138,21 @@ fn build(ctx: &Ctx, path: &Path, renderer: &render::Renderer) -> anyhow::Result<
         let front_matter: Vec<_> = entries
             .par_iter()
             .zip(&mut content)
-            .map(
-                |(_meta, content)| match front_matter::parse_front_matter(content) {
-                    Ok((front_matter, rest)) => {
-                        *content = rest;
-                        Ok(front_matter)
-                    }
-                    Err(err) => Err(err),
-                },
-            )
+            .map(|(_meta, content)| match front_matter::parse_front_matter(content) {
+                Ok((front_matter, rest)) => {
+                    *content = rest;
+                    Ok(front_matter)
+                }
+                Err(err) => Err(err),
+            })
             .collect::<anyhow::Result<_>>()?;
 
         (content, front_matter)
     };
 
-    let mut parsed: Vec<Vec<jotdown::Event<'_>>> = content
+    let mut parsed: Vec<Vec<ir_markup::Event<'_>>> = content
         .par_iter()
-        .map(|content| jotdown::Parser::new(content).collect())
+        .map(|content| djot::djot_to_ir(jotdown::Parser::new(content)).collect())
         .collect();
 
     // Parse entry front matter, consuming the front matter events from `parsed`
@@ -173,7 +161,7 @@ fn build(ctx: &Ctx, path: &Path, renderer: &render::Renderer) -> anyhow::Result<
         .zip(&mut parsed)
         .zip(&mut front_matter)
         .for_each(|((meta, parsed), front_matter)| {
-            if let Ok(Some(title)) = djot::parse_and_render_title(parsed) {
+            if let Ok(Some(title)) = ir_markup::parse_and_render_title(parsed) {
                 front_matter.title = title;
             } else {
                 front_matter.title = meta.slug.clone();
@@ -223,9 +211,6 @@ fn build(ctx: &Ctx, path: &Path, renderer: &render::Renderer) -> anyhow::Result<
     // entries link here")
     // Records entry indices: linker => linkee
     let references: Vec<(usize, usize)> = {
-        // let mut references: Vec<(usize, usize)> = (0..entries.len()).map(|_| vec![]).collect();
-        // let mut references: Vec<(usize, usize)> = Vec::new();
-
         let entries_by_name: HashMap<&str, &types::EntryMetaAndFrontMatter> = {
             let mut map = HashMap::new();
             for entry in entries_and_front_matter.iter() {
@@ -245,16 +230,15 @@ fn build(ctx: &Ctx, path: &Path, renderer: &render::Renderer) -> anyhow::Result<
             .par_iter_mut()
             .enumerate()
             .map(|(linker_idx, parsed)| {
-                let internal_links =
-                    djot::rewrite_and_emit_internal_links(parsed, &entries_by_name)?;
+                let internal_links = ir_markup::rewrite_and_emit_internal_links(parsed, &entries_by_name)?;
 
                 let mut linkee_indices = internal_links
                     .into_iter()
                     .map(|linkee_entry| {
                         let linkee_addr = (linkee_entry as *const _) as usize;
                         // calculate index of referenced entry by memory address
-                        let linkee_idx = (linkee_addr - entries_addr)
-                            / std::mem::size_of::<types::EntryMetaAndFrontMatter>();
+                        let linkee_idx =
+                            (linkee_addr - entries_addr) / std::mem::size_of::<types::EntryMetaAndFrontMatter>();
                         (linker_idx, linkee_idx)
                     })
                     .collect::<Vec<_>>();
@@ -279,11 +263,13 @@ fn build(ctx: &Ctx, path: &Path, renderer: &render::Renderer) -> anyhow::Result<
         .zip(images)
         .zip(&front_matter)
         .map(|(((meta, parsed), images), front_matter)| {
-            djot::render(parsed, &images).map(|(summary, rest)| types::Entry {
+            let mut buf = String::new();
+            ir_markup::push_html(&mut buf, parsed.into_iter(), &images)?;
+            Ok(types::Entry {
                 meta,
                 front_matter,
-                summary,
-                rest,
+                summary: buf,
+                rest: String::new(),
             })
         })
         .collect::<anyhow::Result<_>>()?;
@@ -311,9 +297,8 @@ fn build(ctx: &Ctx, path: &Path, renderer: &render::Renderer) -> anyhow::Result<
     {
         let rendered = &rendered;
         rayon::scope(|s| {
-            let (result_tx, result_rx) = mpsc::sync_channel::<(&'_ Path, anyhow::Result<Vec<u8>>)>(
-                rayon::current_num_threads(),
-            );
+            let (result_tx, result_rx) =
+                mpsc::sync_channel::<(&'_ Path, anyhow::Result<Vec<u8>>)>(rayon::current_num_threads());
 
             s.spawn(move |s| {
                 for (entry, references) in rendered.iter().zip(references) {
@@ -339,9 +324,8 @@ fn build(ctx: &Ctx, path: &Path, renderer: &render::Renderer) -> anyhow::Result<
     {
         let path = path.join("templates");
         rayon::scope(|s| -> anyhow::Result<()> {
-            let (result_tx, result_rx) = mpsc::sync_channel::<anyhow::Result<(PathBuf, String)>>(
-                rayon::current_num_threads(),
-            );
+            let (result_tx, result_rx) =
+                mpsc::sync_channel::<anyhow::Result<(PathBuf, String)>>(rayon::current_num_threads());
 
             for template_path in walkdir::WalkDir::new(&path).follow_links(true) {
                 let template_path = template_path?;
@@ -367,16 +351,13 @@ fn build(ctx: &Ctx, path: &Path, renderer: &render::Renderer) -> anyhow::Result<
 
                         let out_file = {
                             let template_path = template_path.clone();
-                            let extension = extension
-                                .map(|ext| format!(".{ext}"))
-                                .unwrap_or(String::new());
+                            let extension = extension.map(|ext| format!(".{ext}")).unwrap_or(String::new());
                             move |page| -> PathBuf {
                                 if page == 0 {
                                     template_path.with_file_name(format!("{file_name}{extension}"))
                                 } else {
                                     let page = page + 1;
-                                    template_path
-                                        .with_file_name(format!("{file_name}-{page}{extension}"))
+                                    template_path.with_file_name(format!("{file_name}-{page}{extension}"))
                                 }
                             }
                         };
@@ -399,8 +380,7 @@ fn build(ctx: &Ctx, path: &Path, renderer: &render::Renderer) -> anyhow::Result<
                             }
                             let result = result.unwrap();
                             for page in result {
-                                let _ = result_tx
-                                    .send(page.map(|(page, content)| (out_file(page), content)));
+                                let _ = result_tx.send(page.map(|(page, content)| (out_file(page), content)));
                             }
                         });
                     }
@@ -481,50 +461,36 @@ fn main() -> anyhow::Result<()> {
         let cvar_pair = Arc::new((Mutex::new(FsChange::Template), Condvar::new()));
         let cvar_pair2 = cvar_pair.clone();
         let path_prefix = args.path.canonicalize()?;
-        let mut debouncer = new_debouncer(
-            Duration::from_millis(250),
-            None,
-            move |ev: DebounceEventResult| {
-                let (lock, cvar) = &*cvar_pair2;
-                let mut change_ = FsChange::Other;
+        let mut debouncer = new_debouncer(Duration::from_millis(250), None, move |ev: DebounceEventResult| {
+            let (lock, cvar) = &*cvar_pair2;
+            let mut change_ = FsChange::Other;
 
-                if let Ok(evs) = ev {
-                    if evs
-                        .into_iter()
-                        .flat_map(|e| e.event.paths.into_iter())
-                        .any(|path| {
-                            path.strip_prefix(&path_prefix)
-                                .map(|path| path.starts_with("templates"))
-                                .unwrap_or(false)
-                        })
-                    {
-                        change_ = FsChange::Template;
-                    }
+            if let Ok(evs) = ev {
+                if evs.into_iter().flat_map(|e| e.event.paths.into_iter()).any(|path| {
+                    path.strip_prefix(&path_prefix)
+                        .map(|path| path.starts_with("templates"))
+                        .unwrap_or(false)
+                }) {
+                    change_ = FsChange::Template;
                 }
+            }
 
-                let mut change = lock.lock().unwrap();
-                *change = change_;
-                cvar.notify_one();
-            },
-        )
+            let mut change = lock.lock().unwrap();
+            *change = change_;
+            cvar.notify_one();
+        })
         .unwrap();
 
-        debouncer
-            .watcher()
-            .watch(&args.path, RecursiveMode::Recursive)
-            .unwrap();
-        debouncer
-            .cache()
-            .add_root(&args.path, RecursiveMode::Recursive);
+        debouncer.watcher().watch(&args.path, RecursiveMode::Recursive).unwrap();
+        debouncer.cache().add_root(&args.path, RecursiveMode::Recursive);
 
         let mut site_config: Option<config::SiteConfig> = None;
         let mut renderer: Option<render::Renderer> = None;
 
         let mut build_watch = move |change: FsChange| -> anyhow::Result<()> {
             let config_changed = {
-                let site_config_: config::SiteConfig =
-                    toml::from_str(&std::fs::read_to_string(&site_config_path)?)
-                        .with_context(|| "Parsing sprokkel.toml")?;
+                let site_config_: config::SiteConfig = toml::from_str(&std::fs::read_to_string(&site_config_path)?)
+                    .with_context(|| "Parsing sprokkel.toml")?;
 
                 let config_changed = Some(&site_config_) != site_config.as_ref();
                 if config_changed && site_config.is_some() {
@@ -549,9 +515,7 @@ fn main() -> anyhow::Result<()> {
             }
             log::info!(
                 "======== Building took {}ms ========",
-                std::time::Instant::now()
-                    .duration_since(instant)
-                    .as_millis()
+                std::time::Instant::now().duration_since(instant).as_millis()
             );
 
             Ok(())
@@ -572,8 +536,7 @@ fn main() -> anyhow::Result<()> {
             }
         }
     } else {
-        let site_config: config::SiteConfig =
-            toml::from_str(&std::fs::read_to_string(&site_config_path)?)?;
+        let site_config: config::SiteConfig = toml::from_str(&std::fs::read_to_string(&site_config_path)?)?;
         let ctx = Ctx::from_site_config(build_kind, &site_config);
         let renderer = render::Renderer::build(&ctx, args.path.join("templates"))?;
         build(&ctx, &args.path, &renderer)?;

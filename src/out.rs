@@ -25,11 +25,7 @@ impl Out {
 
     /// Copy a file by copying all bytes from `in_file` to `out_file`. This does not copy file
     /// attributes. Recursively creates `out_path` if it or its directory does not yet exist.
-    pub fn copy_file(
-        &self,
-        in_file: impl AsRef<Path>,
-        out_file: impl AsRef<Path>,
-    ) -> anyhow::Result<()> {
+    pub fn copy_file(&self, in_file: impl AsRef<Path>, out_file: impl AsRef<Path>) -> anyhow::Result<()> {
         let mut fr = File::open(in_file)?;
         self.update_file(&mut fr, out_file)?;
 
@@ -38,11 +34,7 @@ impl Out {
 
     /// Write a file with the given `content` to `out_file`. Recursively creates `out_path` if it or
     /// its directory does not yet exist.
-    pub fn update_file(
-        &self,
-        content: &mut impl Read,
-        out_file: impl AsRef<Path>,
-    ) -> anyhow::Result<()> {
+    pub fn update_file(&self, content: &mut impl Read, out_file: impl AsRef<Path>) -> anyhow::Result<()> {
         let out_file = self.prefix.join(out_file);
 
         if let Some(parent) = out_file.parent() {
@@ -58,11 +50,7 @@ impl Out {
     /// Concatenate all files in `in_dir` to `out_file`. Recursively creates `out_path` if it or
     /// its directory does not yet exist. `out_file` is only created if there are files in
     /// `in_dir`.
-    pub fn cat_dir(
-        &self,
-        in_dir: impl AsRef<Path>,
-        out_file: impl AsRef<Path>,
-    ) -> anyhow::Result<()> {
+    pub fn cat_dir(&self, in_dir: impl AsRef<Path>, out_file: impl AsRef<Path>) -> anyhow::Result<()> {
         let out_file = self.prefix.join(out_file);
 
         if let Some(parent) = out_file.parent() {
@@ -99,11 +87,7 @@ impl Out {
 
     /// Copy all files and directories from `in_dir` to `out_dir`. Files are copied by copying bytes.
     /// This does not copy file/directory attributes.
-    pub fn copy_dir(
-        &self,
-        in_dir: impl AsRef<Path>,
-        out_dir: impl AsRef<Path>,
-    ) -> anyhow::Result<()> {
+    pub fn copy_dir(&self, in_dir: impl AsRef<Path>, out_dir: impl AsRef<Path>) -> anyhow::Result<()> {
         let in_dir = in_dir.as_ref();
         let out_dir = out_dir.as_ref();
 

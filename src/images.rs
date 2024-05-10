@@ -7,7 +7,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use crate::{out::Out, types};
+use crate::{ir_markup, out::Out, types};
 
 #[derive(Debug)]
 struct Response {
@@ -27,10 +27,7 @@ fn make_image_path_for_width<const W: u32>(path: &Path) -> PathBuf {
     image_path
 }
 
-fn encode_image(
-    image: &image::DynamicImage,
-    format: image::ImageFormat,
-) -> anyhow::Result<Vec<u8>> {
+fn encode_image(image: &image::DynamicImage, format: image::ImageFormat) -> anyhow::Result<Vec<u8>> {
     let mut buf = Cursor::new(Vec::new());
 
     match format {
@@ -119,22 +116,17 @@ fn extract_image(out_file: PathBuf, image_data: Vec<u8>) -> anyhow::Result<Respo
     }
     write_files.push((out_file, full));
 
-    anyhow::Ok(Response {
-        images,
-        write_files,
-    })
+    anyhow::Ok(Response { images, write_files })
 }
 
 pub fn extract_images<'a>(
     out: &Out,
     entries: &[types::EntryMeta],
-    parsed_entries: &[Vec<jotdown::Event<'a>>],
+    parsed_entries: &[Vec<ir_markup::Event<'a>>],
 ) -> anyhow::Result<Vec<HashMap<String, types::Images>>> {
     let (tx, rx) = std::sync::mpsc::channel::<(usize, String, anyhow::Result<Response>)>();
 
-    let mut images = (0..entries.len())
-        .map(|_| HashMap::new())
-        .collect::<Vec<_>>();
+    let mut images = (0..entries.len()).map(|_| HashMap::new()).collect::<Vec<_>>();
 
     // Read and write image data serially, process concurrently. Uses quite some memory but keeps
     // i/o fast
@@ -165,8 +157,13 @@ pub fn extract_images<'a>(
                 links.clear();
 
                 for event in parsed_entry {
-                    if let jotdown::Event::Start(jotdown::Container::Image(link, _), _) = event {
-                        links.insert(link.as_ref());
+                    if let ir_markup::Event::Image {
+                        destination,
+                        alt: _,
+                        attributes: _,
+                    } = event
+                    {
+                        links.insert(destination.as_ref());
                     }
                 }
 
@@ -181,12 +178,8 @@ pub fn extract_images<'a>(
                     // this provides no backpresure. if processing is much slower than reading from
                     // disk, we can easily exhaust memory
                     s.spawn(move |_| {
-                        tx.send((
-                            idx,
-                            image_link.to_owned(),
-                            extract_image(out_file, image_data),
-                        ))
-                        .unwrap();
+                        tx.send((idx, image_link.to_owned(), extract_image(out_file, image_data)))
+                            .unwrap();
                     });
                 }
             }

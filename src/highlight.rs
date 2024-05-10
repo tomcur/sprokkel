@@ -1,7 +1,8 @@
 use std::{cell::RefCell, sync::OnceLock};
 use tree_sitter_highlight::{HighlightConfiguration, HighlightEvent, Highlighter as Highlighter_};
 
-type Configurations = dyn (Fn(&str) -> Option<&'static HighlightConfiguration>) + Send + Sync;
+/// takes a language name, returns canonical name and highlight configuration
+type Configurations = dyn (Fn(&str) -> Option<(&'static str, &'static HighlightConfiguration)>) + Send + Sync;
 static CONFIGURATIONS: OnceLock<Box<Configurations>> = OnceLock::new();
 
 thread_local!(static HIGHLIGHTER: RefCell<Highlighter> = RefCell::new(Highlighter::new()));
@@ -121,26 +122,20 @@ fn init_configurations() -> Box<Configurations> {
         ]
         .into_iter()
         .collect();
-        HighlightConfiguration::new(
-            tree_sitter_typescript::language_typescript(),
-            &highlights,
-            "",
-            &locals,
-        )
-        .unwrap()
+        HighlightConfiguration::new(tree_sitter_typescript::language_typescript(), &highlights, "", &locals).unwrap()
     }));
     typescript_config.configure(HIGHLIGHT_NAMES);
 
     let highlight_configurations = |language: &'_ str| match language {
-        "bash" | "sh" | "shell" => Some(bash_config as &'static _),
-        "c" => Some(c_config as &'static _),
-        "cpp" | "c++" => Some(cpp_config as &'static _),
-        "djot" => Some(djot_config as &'static _),
-        "nix" => Some(nix_config as &'static _),
-        "python" => Some(python_config as &'static _),
-        "rust" => Some(rust_config as &'static _),
-        "toml" => Some(toml_config as &'static _),
-        "typescript" | "ts" | "javascript" | "js" => Some(typescript_config as &'static _),
+        "bash" | "sh" | "shell" => Some(("bash", bash_config as &'static _)),
+        "c" => Some(("c", c_config as &'static _)),
+        "cpp" | "c++" => Some(("cpp", cpp_config as &'static _)),
+        "djot" => Some(("djot", djot_config as &'static _)),
+        "nix" => Some(("nix", nix_config as &'static _)),
+        "python" => Some(("python", python_config as &'static _)),
+        "rust" => Some(("rust", rust_config as &'static _)),
+        "toml" => Some(("toml", toml_config as &'static _)),
+        "typescript" | "ts" | "javascript" | "js" => Some(("typescript", typescript_config as &'static _)),
         _ => None,
     };
 
@@ -158,15 +153,15 @@ impl Highlighter {
     }
 }
 
-pub fn highlight(code: &str, language: &str) -> Result<String, Error> {
+fn highlight_inner(code: &str, language: &str) -> Result<(&'static str, String), Error> {
     let code = code.as_bytes();
 
     HIGHLIGHTER.with_borrow_mut(|this| {
-        let config = (*this.configurations)(language)
-            .ok_or(tree_sitter_highlight::Error::InvalidLanguage)?;
+        let (language, config) =
+            (*this.configurations)(language).ok_or(tree_sitter_highlight::Error::InvalidLanguage)?;
         let highlights = this
             .highlighter
-            .highlight(config, code, None, |lang| (*this.configurations)(lang))?;
+            .highlight(config, code, None, |lang| (*this.configurations)(lang).map(|c| c.1))?;
 
         let mut buf = Vec::with_capacity(code.len());
         for event in highlights {
@@ -193,6 +188,33 @@ pub fn highlight(code: &str, language: &str) -> Result<String, Error> {
             }
         }
 
-        Ok(String::from_utf8(buf).expect("valid Unicode"))
+        Ok((language, String::from_utf8(buf).expect("valid Unicode")))
     })
+}
+
+pub enum Highlighted<'s> {
+    Plain(String),
+    Highlighted { language: &'s str, highlighted: String },
+}
+
+pub fn highlight<'s>(code: &str, language: &'s str) -> anyhow::Result<Highlighted<'s>> {
+    if matches!(language, "" | "plain" | "text" | "plaintext") {
+        let mut res = String::new();
+        pulldown_cmark_escape::escape_html_body_text(&mut res, code)?;
+        Ok(Highlighted::Plain(res))
+    } else {
+        match highlight_inner(&code, language) {
+            Ok((language, highlighted)) => Ok(Highlighted::Highlighted { language, highlighted }),
+            Err(Error::InvalidLanguage) => {
+                log::warn!("an invalid highlight language was requested: {language}");
+                let mut res = String::new();
+                pulldown_cmark_escape::escape_html_body_text(&mut res, code)?;
+                Ok(Highlighted::Highlighted {
+                    language,
+                    highlighted: res,
+                })
+            }
+            Err(Error::Other) => Err(anyhow::anyhow!("an unexpected highlighting error occurred")),
+        }
+    }
 }

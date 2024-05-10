@@ -15,16 +15,22 @@ latex2mathml = ["dep:latex2mathml"]
 
 [dependencies]
 anyhow = "1"
+bitvec = "1.0.1"
 clap = { version = "4.5", features = ["derive"] }
 image = "0.25"
-jotdown = "0.4"
 notify-debouncer-full = "0.3"
 minijinja = { version = "1.0", features = ["loader"] }
 rayon = "1.10"
 serde = { version = "1", features = ["derive"] }
 serde_yaml = "0.9.34+deprecated"
+thiserror = "1.0.60"
 toml = "0.8"
 walkdir = "2.5"
+
+bumpalo = { version = "3.16", features = ["collections"] }
+genawaiter = { version = "0.99", features = ["proc_macro"] }
+jotdown = "0.4"
+pulldown-cmark-escape = "0.10.1"
 
 log = "0.4"
 simplelog = { version = "0.12.0", features = ["paris"] }

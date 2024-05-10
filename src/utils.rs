@@ -1,5 +1,5 @@
 use anyhow::anyhow;
-use std::path::Path;
+use std::{borrow::Cow, path::Path};
 
 /// Turn a path into a URL with a given prefix. If a scheme and host is given, the path becomes an
 /// absolute URL.
