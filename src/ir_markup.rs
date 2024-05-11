@@ -572,7 +572,7 @@ impl<'w> Writer<'w> {
                     self.write("</p>\n")?
                 }
             }
-            ContainerEnd::Link => self.write("</a>\n")?,
+            ContainerEnd::Link => self.write("</a>")?,
 
             ContainerEnd::List { kind } => {
                 self.list_tightness.pop();
