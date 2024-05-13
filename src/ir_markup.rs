@@ -102,60 +102,6 @@ pub enum MathKind {
     Inline,
 }
 
-// pub use jotdown::ListKind;
-
-// use jotdown::Attributes;
-//
-
-//
-// enum Event<'s> {
-//     Start(Container<'s>, Attributes<'s>),
-//     End(ContainerEnd),
-//     Str(Cow<'s, str>),
-// }
-//
-// enum Container {
-//     Blockquote,
-//     List { kind: ListKind, tight: bool, },
-//     Image { location: Cow<'s, str> },
-//     Other { tag: Cow<'s, str> },
-// }
-//
-// enum ContainerEnd {
-//     Blockquote,
-//     List,
-//     Image,
-//     Other { tag: Cow<'s, str> },
-// }
-
-// pub enum Container<'s> {
-//     Blockquote,
-//     List { kind: ListKind, tight: bool },
-//     Paragraph,
-//     Section { id: Cow<'s, str> },
-//     Other { tag: Cow<'s, str> },
-// }
-//
-// pub enum Node<'alloc, 's> {
-//     Container {
-//         container: Container<'s>,
-//         attributes: Attributes<'s>,
-//         children: Vec<'alloc, Node<'alloc, 's>>,
-//     },
-//     Image {
-//         location: Cow<'s, str>,
-//     },
-//     Figure {
-//         figure: Vec<'alloc, Node<'alloc, 's>>,
-//         caption: Vec<'alloc, Node<'alloc, 's>>,
-//     },
-// }
-//
-// pub struct Document<'alloc, 's> {
-//     summary: Vec<'alloc, Node<'alloc, 's>>,
-//     rest: Vec<'alloc, Node<'alloc, 's>>,
-// }
-
 #[derive(Clone, Debug)]
 pub enum Container<'s> {
     Blockquote,
