@@ -74,7 +74,7 @@ impl<'s> Attributes<'s> {
         }
     }
 
-    fn into_iter(self) -> impl Iterator<Item = (Cow<'s, str>, AttributeValueMore<'s>)> {
+    fn into_iter(self) -> impl Iterator<Item = (Cow<'s, str>, AttributeValuePlusFmt<'s>)> {
         self.attributes.into_iter().map(|(attr, val)| (attr, val.into()))
     }
 }
@@ -144,68 +144,66 @@ where
 
 /// Store attribute values that are to be written escaped. Only meant for internal usage here to
 /// prevent some allocations.
-enum AttributeValueMore<'s> {
+enum AttributeValuePlusFmt<'s> {
     Jotdown(jotdown::AttributeValue<'s>),
     Raw(Cow<'s, str>),
     FmtArguments(std::fmt::Arguments<'s>),
     Display(&'s dyn std::fmt::Display),
 }
 
-impl AttributeValueMore<'_> {
+impl AttributeValuePlusFmt<'_> {
     fn write_escaped(&self, buf: &mut String) {
         match self {
-            AttributeValueMore::Jotdown(val) => write!(buf, "{val}").expect("infallible"),
-            AttributeValueMore::Raw(val) => pulldown_cmark_escape::escape_html(buf, val).expect("infallible"),
-            AttributeValueMore::FmtArguments(val) => write!(buf, "{val}").expect("infallible"),
-            AttributeValueMore::Display(val) => write!(buf, "{val}").expect("infallible"),
+            AttributeValuePlusFmt::Jotdown(val) => write!(buf, "{val}").expect("infallible"),
+            AttributeValuePlusFmt::Raw(val) => pulldown_cmark_escape::escape_html(buf, val).expect("infallible"),
+            AttributeValuePlusFmt::FmtArguments(val) => write!(buf, "{val}").expect("infallible"),
+            AttributeValuePlusFmt::Display(val) => write!(buf, "{val}").expect("infallible"),
         }
     }
 }
 
-impl<'s> From<AttributeValue<'s>> for AttributeValueMore<'s> {
+impl<'s> From<AttributeValue<'s>> for AttributeValuePlusFmt<'s> {
     fn from(value: AttributeValue<'s>) -> Self {
         match value {
-            AttributeValue::Jotdown(val) => AttributeValueMore::Jotdown(val),
-            AttributeValue::Raw(val) => AttributeValueMore::Raw(val),
+            AttributeValue::Jotdown(val) => AttributeValuePlusFmt::Jotdown(val),
+            AttributeValue::Raw(val) => AttributeValuePlusFmt::Raw(val),
         }
     }
 }
 
-impl<'s> From<jotdown::AttributeValue<'s>> for AttributeValueMore<'s> {
+impl<'s> From<jotdown::AttributeValue<'s>> for AttributeValuePlusFmt<'s> {
     fn from(value: jotdown::AttributeValue<'s>) -> Self {
-        AttributeValueMore::Jotdown(value)
+        AttributeValuePlusFmt::Jotdown(value)
     }
 }
 
-impl<'s> From<Cow<'s, str>> for AttributeValueMore<'s> {
+impl<'s> From<Cow<'s, str>> for AttributeValuePlusFmt<'s> {
     fn from(value: Cow<'s, str>) -> Self {
-        AttributeValueMore::Raw(value)
+        AttributeValuePlusFmt::Raw(value)
     }
 }
 
-impl<'s> From<&'s str> for AttributeValueMore<'s> {
+impl<'s> From<&'s str> for AttributeValuePlusFmt<'s> {
     fn from(value: &'s str) -> Self {
-        AttributeValueMore::Raw(value.into())
+        AttributeValuePlusFmt::Raw(value.into())
     }
 }
 
-impl<'s> From<String> for AttributeValueMore<'s> {
+impl<'s> From<String> for AttributeValuePlusFmt<'s> {
     fn from(value: String) -> Self {
-        AttributeValueMore::Raw(value.into())
+        AttributeValuePlusFmt::Raw(value.into())
     }
 }
 
-impl<'s> From<std::fmt::Arguments<'s>> for AttributeValueMore<'s> {
+impl<'s> From<std::fmt::Arguments<'s>> for AttributeValuePlusFmt<'s> {
     fn from(value: std::fmt::Arguments<'s>) -> Self {
-        AttributeValueMore::FmtArguments(value)
+        AttributeValuePlusFmt::FmtArguments(value)
     }
 }
 
-impl<'s> From<&'s std::fmt::Arguments<'s>> for AttributeValueMore<'s> {
+impl<'s> From<&'s std::fmt::Arguments<'s>> for AttributeValuePlusFmt<'s> {
     fn from(value: &'s std::fmt::Arguments<'s>) -> Self {
-        AttributeValueMore::Display(value)
-    }
-}
+        AttributeValuePlusFmt::Display(value)
     }
 }
 
@@ -437,7 +435,7 @@ impl<'w> Writer<'w> {
     fn write_tag_with_attributes<'a>(
         &mut self,
         tag: &str,
-        attributes: impl IntoIterator<Item = (Cow<'a, str>, AttributeValueMore<'a>)>,
+        attributes: impl IntoIterator<Item = (Cow<'a, str>, AttributeValuePlusFmt<'a>)>,
     ) -> Result<()> {
         self.with_buf(|buf| {
             buf.push('<');
@@ -459,7 +457,7 @@ impl<'w> Writer<'w> {
     fn write_tag_with_attributes_on_new_line<'a>(
         &mut self,
         tag: &str,
-        attributes: impl IntoIterator<Item = (Cow<'a, str>, AttributeValueMore<'a>)>,
+        attributes: impl IntoIterator<Item = (Cow<'a, str>, AttributeValuePlusFmt<'a>)>,
     ) -> Result<()> {
         self.ensure_newline()?;
         self.write_tag_with_attributes(tag, attributes)?;
@@ -600,9 +598,9 @@ impl<'w> Writer<'w> {
                 let tag = if head { "th" } else { "td" };
                 let style = match alignment {
                     Alignment::Unspecified => None,
-                    Alignment::Left => Some(("style".into(), AttributeValueMore::from("text-align: left;"))),
-                    Alignment::Center => Some(("style".into(), AttributeValueMore::from("text-align: center;"))),
-                    Alignment::Right => Some(("style".into(), AttributeValueMore::from("text-align: right;"))),
+                    Alignment::Left => Some(("style".into(), AttributeValuePlusFmt::from("text-align: left;"))),
+                    Alignment::Center => Some(("style".into(), AttributeValuePlusFmt::from("text-align: center;"))),
+                    Alignment::Right => Some(("style".into(), AttributeValuePlusFmt::from("text-align: right;"))),
                 };
                 self.write_tag_with_attributes_on_new_line(tag, style)?
             }
