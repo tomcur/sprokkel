@@ -4,8 +4,8 @@ use jotdown::{Alignment, Attributes, Container, Event, ListKind, OrderedListNumb
 use std::borrow::Cow;
 
 use crate::ir_markup::{
-    Alignment as IrAlignment, Container as IrContainer, ContainerEnd as IrContainerEnd, Event as IrEvent,
-    ListKind as IrListKind, MathKind as IrMathKind, OrderedListNumbering as IrOrderedListNumbering,
+    Alignment as IrAlignment, Attributes as IrAttributes, Container as IrContainer, ContainerEnd as IrContainerEnd,
+    Event as IrEvent, ListKind as IrListKind, MathKind as IrMathKind, OrderedListNumbering as IrOrderedListNumbering,
 };
 
 /// Iterates from an Event::Start to a matching Event::End. The resulting iterator yields all
@@ -107,7 +107,7 @@ pub fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterato
                 Event::Start(Container::Blockquote, attributes) => {
                     co.yield_(IrEvent::Start {
                         container: IrContainer::Blockquote,
-                        attributes,
+                        attributes: attributes.into(),
                     })
                     .await
                 }
@@ -121,7 +121,7 @@ pub fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterato
                 Event::Start(Container::DescriptionList, attributes) => {
                     co.yield_(IrEvent::Start {
                         container: IrContainer::DescriptionList,
-                        attributes,
+                        attributes: attributes.into(),
                     })
                     .await
                 }
@@ -134,7 +134,7 @@ pub fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterato
                 Event::Start(Container::DescriptionTerm, attributes) => {
                     co.yield_(IrEvent::Start {
                         container: IrContainer::DescriptionTerm,
-                        attributes,
+                        attributes: attributes.into(),
                     })
                     .await
                 }
@@ -147,7 +147,7 @@ pub fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterato
                 Event::Start(Container::DescriptionDetails, attributes) => {
                     co.yield_(IrEvent::Start {
                         container: IrContainer::DescriptionDetails,
-                        attributes,
+                        attributes: attributes.into(),
                     })
                     .await
                 }
@@ -168,7 +168,7 @@ pub fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterato
                 ) => {
                     co.yield_(IrEvent::Start {
                         container: IrContainer::Heading { level, id },
-                        attributes,
+                        attributes: attributes.into(),
                     })
                     .await
                 }
@@ -178,14 +178,17 @@ pub fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterato
                     id: _,
                 }) => {
                     co.yield_(IrEvent::End {
-                        container: IrContainerEnd::Heading { level },
+                        container: IrContainerEnd::Heading {
+                            // TODO: remove unwrap
+                            level: level.try_into().unwrap(),
+                        },
                     })
                     .await
                 }
                 Event::Start(Container::Section { id }, attributes) => {
                     co.yield_(IrEvent::Start {
                         container: IrContainer::Section { id },
-                        attributes,
+                        attributes: attributes.into(),
                     })
                     .await
                 }
@@ -198,7 +201,7 @@ pub fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterato
                 Event::Start(Container::Div { class: _ }, attributes) => {
                     co.yield_(IrEvent::Start {
                         container: IrContainer::Div,
-                        attributes,
+                        attributes: attributes.into(),
                     })
                     .await
                 }
@@ -211,7 +214,7 @@ pub fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterato
                 Event::Start(Container::Paragraph, attributes) => {
                     co.yield_(IrEvent::Start {
                         container: IrContainer::Paragraph,
-                        attributes,
+                        attributes: attributes.into(),
                     })
                     .await
                 }
@@ -226,7 +229,7 @@ pub fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterato
                     co.yield_(IrEvent::Image {
                         destination,
                         alt,
-                        attributes,
+                        attributes: attributes.into(),
                     })
                     .await
                 }
@@ -234,7 +237,7 @@ pub fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterato
                 Event::Start(Container::Link(destination, _link_type), attributes) => {
                     co.yield_(IrEvent::Start {
                         container: IrContainer::Link { destination },
-                        attributes,
+                        attributes: attributes.into(),
                     })
                     .await
                 }
@@ -250,7 +253,7 @@ pub fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterato
                     co.yield_(IrEvent::CodeBlock {
                         language: language.into(),
                         code,
-                        attributes,
+                        attributes: attributes.into(),
                     })
                     .await
                 }
@@ -264,7 +267,7 @@ pub fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterato
                             IrMathKind::Inline
                         },
                         math,
-                        attributes,
+                        attributes: attributes.into(),
                     })
                     .await
                 }
@@ -273,14 +276,22 @@ pub fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterato
                 Event::Start(Container::RawInline { format }, attributes) => {
                     let content = render_to_raw_string(iter_container_from_inside(&mut djot));
                     if matches!(format, "html" | "HTML") {
-                        co.yield_(IrEvent::HtmlInline { content, attributes }).await
+                        co.yield_(IrEvent::HtmlInline {
+                            content,
+                            attributes: attributes.into(),
+                        })
+                        .await
                     }
                 }
                 Event::End(Container::RawInline { .. }) => unreachable!(),
                 Event::Start(Container::RawBlock { format }, attributes) => {
                     let content = render_to_raw_string(iter_container_from_inside(&mut djot));
                     if matches!(format, "html" | "HTML") {
-                        co.yield_(IrEvent::HtmlBlock { content, attributes }).await
+                        co.yield_(IrEvent::HtmlBlock {
+                            content,
+                            attributes: attributes.into(),
+                        })
+                        .await
                     }
                 }
                 Event::End(Container::RawBlock { .. }) => unreachable!(),
@@ -291,7 +302,7 @@ pub fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterato
                             kind: kind.into(),
                             tight,
                         },
-                        attributes,
+                        attributes: attributes.into(),
                     })
                     .await
                 }
@@ -304,7 +315,7 @@ pub fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterato
                 Event::Start(Container::ListItem, attributes) => {
                     co.yield_(IrEvent::Start {
                         container: IrContainer::ListItem,
-                        attributes,
+                        attributes: attributes.into(),
                     })
                     .await
                 }
@@ -317,7 +328,7 @@ pub fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterato
                 Event::Start(Container::TaskListItem { checked }, attributes) => {
                     co.yield_(IrEvent::Start {
                         container: IrContainer::TaskListItem { checked },
-                        attributes,
+                        attributes: attributes.into(),
                     })
                     .await
                 }
@@ -331,12 +342,12 @@ pub fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterato
                 Event::Start(Container::Table, attributes) => {
                     co.yield_(IrEvent::Start {
                         container: IrContainer::Table,
-                        attributes,
+                        attributes: attributes.into(),
                     })
                     .await;
                     co.yield_(IrEvent::Start {
                         container: IrContainer::TableBody,
-                        attributes: jotdown::Attributes::new(),
+                        attributes: IrAttributes::new(),
                     })
                     .await;
                 }
@@ -353,7 +364,7 @@ pub fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterato
                 Event::Start(Container::TableRow { head: _ }, attributes) => {
                     co.yield_(IrEvent::Start {
                         container: IrContainer::TableRow,
-                        attributes,
+                        attributes: attributes.into(),
                     })
                     .await
                 }
@@ -369,7 +380,7 @@ pub fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterato
                             alignment: alignment.into(),
                             head,
                         },
-                        attributes,
+                        attributes: attributes.into(),
                     })
                     .await
                 }
@@ -383,7 +394,7 @@ pub fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterato
                 Event::Start(Container::Footnote { label }, attributes) => {
                     co.yield_(IrEvent::Start {
                         container: IrContainer::Footnote { label: label.into() },
-                        attributes,
+                        attributes: attributes.into(),
                     })
                     .await
                 }
@@ -400,7 +411,7 @@ pub fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterato
                 Event::Start(Container::Caption, attributes) => {
                     co.yield_(IrEvent::Start {
                         container: IrContainer::Other { tag: "caption".into() },
-                        attributes,
+                        attributes: attributes.into(),
                     })
                     .await
                 }
@@ -413,7 +424,7 @@ pub fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterato
                 Event::Start(Container::Verbatim, attributes) => {
                     co.yield_(IrEvent::Start {
                         container: IrContainer::Other { tag: "code".into() },
-                        attributes,
+                        attributes: attributes.into(),
                     })
                     .await
                 }
@@ -426,7 +437,7 @@ pub fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterato
                 Event::Start(Container::Span, attributes) => {
                     co.yield_(IrEvent::Start {
                         container: IrContainer::Other { tag: "span".into() },
-                        attributes,
+                        attributes: attributes.into(),
                     })
                     .await
                 }
@@ -439,7 +450,7 @@ pub fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterato
                 Event::Start(Container::Subscript, attributes) => {
                     co.yield_(IrEvent::Start {
                         container: IrContainer::Other { tag: "sub".into() },
-                        attributes,
+                        attributes: attributes.into(),
                     })
                     .await
                 }
@@ -452,7 +463,7 @@ pub fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterato
                 Event::Start(Container::Superscript, attributes) => {
                     co.yield_(IrEvent::Start {
                         container: IrContainer::Other { tag: "sup".into() },
-                        attributes,
+                        attributes: attributes.into(),
                     })
                     .await
                 }
@@ -465,7 +476,7 @@ pub fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterato
                 Event::Start(Container::Insert, attributes) => {
                     co.yield_(IrEvent::Start {
                         container: IrContainer::Other { tag: "ins".into() },
-                        attributes,
+                        attributes: attributes.into(),
                     })
                     .await
                 }
@@ -478,7 +489,7 @@ pub fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterato
                 Event::Start(Container::Delete, attributes) => {
                     co.yield_(IrEvent::Start {
                         container: IrContainer::Other { tag: "del".into() },
-                        attributes,
+                        attributes: attributes.into(),
                     })
                     .await
                 }
@@ -491,7 +502,7 @@ pub fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterato
                 Event::Start(Container::Strong, attributes) => {
                     co.yield_(IrEvent::Start {
                         container: IrContainer::Other { tag: "strong".into() },
-                        attributes,
+                        attributes: attributes.into(),
                     })
                     .await
                 }
@@ -504,7 +515,7 @@ pub fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterato
                 Event::Start(Container::Emphasis, attributes) => {
                     co.yield_(IrEvent::Start {
                         container: IrContainer::Other { tag: "em".into() },
-                        attributes,
+                        attributes: attributes.into(),
                     })
                     .await
                 }
@@ -517,7 +528,7 @@ pub fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterato
                 Event::Start(Container::Mark, attributes) => {
                     co.yield_(IrEvent::Start {
                         container: IrContainer::Other { tag: "mark".into() },
-                        attributes,
+                        attributes: attributes.into(),
                     })
                     .await
                 }
@@ -533,15 +544,15 @@ pub fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterato
                 Event::Softbreak => co.yield_(IrEvent::Str("\n".into())).await,
                 Event::Hardbreak => {
                     co.yield_(IrEvent::HtmlInline {
-                        content: "<br />".into(),
-                        attributes: jotdown::Attributes::new(),
+                        content: "<br>".into(),
+                        attributes: IrAttributes::new(),
                     })
                     .await
                 }
                 Event::NonBreakingSpace => {
                     co.yield_(IrEvent::HtmlInline {
                         content: "&nbsp;".into(),
-                        attributes: jotdown::Attributes::new(),
+                        attributes: IrAttributes::new(),
                     })
                     .await
                 }
@@ -557,7 +568,7 @@ pub fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterato
                 Event::ThematicBreak(attributes) => {
                     co.yield_(IrEvent::TagWithAttribute {
                         tag: "hr".into(),
-                        attributes,
+                        attributes: attributes.into(),
                     })
                     .await
                 }

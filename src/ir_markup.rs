@@ -5,7 +5,6 @@ use bumpalo::Bump;
 use std::{borrow::Cow, collections::HashMap, fmt::Write};
 
 use bitvec::vec::BitVec;
-use jotdown::Attributes;
 
 use crate::{highlight, types};
 
@@ -21,20 +20,88 @@ pub enum Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
+#[derive(Clone, Debug)]
+pub struct Attributes<'s> {
+    attributes: Vec<(Cow<'s, str>, AttributeValue<'s>)>,
+}
+
+impl<'s> Attributes<'s> {
+    pub fn new() -> Self {
+        Attributes { attributes: Vec::new() }
+    }
+
+    pub fn with_capacity(capacity: usize) -> Self {
+        Attributes {
+            attributes: Vec::with_capacity(capacity),
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.attributes.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    #[allow(unused)]
+    pub fn get(&self, attribute: impl Into<Cow<'s, str>>) -> Option<&AttributeValue<'s>> {
+        let attribute = attribute.into();
+        self.attributes
+            .iter()
+            .find_map(|(attribute_, value)| (*attribute_ == attribute).then(|| value))
+    }
+
+    pub fn push(&mut self, attribute: impl Into<Cow<'s, str>>, value: impl Into<AttributeValue<'s>>) {
+        let attribute = attribute.into();
+
+        if let Some(entry) = self
+            .attributes
+            .iter_mut()
+            .find_map(|(attribute_, value)| (*attribute_ == attribute).then(|| value))
+        {
+            *entry = value.into();
+        } else {
+            // insertion to keep attributes sorted
+            let mut idx = 0;
+            for (attribute_, _) in &self.attributes {
+                if *attribute_ > attribute {
+                    break;
+                }
+                idx += 1;
+            }
+            self.attributes.insert(idx, (attribute, value.into()));
+        }
+    }
+
+    fn into_iter(self) -> impl Iterator<Item = (Cow<'s, str>, AttributeValueMore<'s>)> {
+        self.attributes.into_iter().map(|(attr, val)| (attr, val.into()))
+    }
+}
+
+impl<'s> From<jotdown::Attributes<'s>> for Attributes<'s> {
+    fn from(attributes: jotdown::Attributes<'s>) -> Self {
+        let mut attributes_ = Attributes::with_capacity(attributes.len());
+
+        for (attr, val) in attributes {
+            attributes_.push(attr, val);
+        }
+
+        attributes_
+    }
+}
+
+#[derive(Clone, PartialEq, Eq)]
 pub enum AttributeValue<'s> {
     Jotdown(jotdown::AttributeValue<'s>),
     Raw(Cow<'s, str>),
-    FmtArguments(std::fmt::Arguments<'s>),
-    Display(&'s dyn std::fmt::Display),
 }
 
-impl AttributeValue<'_> {
-    fn write_escaped(&self, buf: &mut String) {
+impl<'s> std::fmt::Debug for AttributeValue<'s> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            AttributeValue::Jotdown(val) => write!(buf, "{val}").expect("infallible"),
-            AttributeValue::Raw(val) => pulldown_cmark_escape::escape_html(buf, val).expect("infallible"),
-            AttributeValue::FmtArguments(val) => write!(buf, "{val}").expect("infallible"),
-            AttributeValue::Display(val) => write!(buf, "{val}").expect("infallible"),
+            AttributeValue::Jotdown(val) => write!(f, "{val:?}"),
+            AttributeValue::Raw(val) => write!(f, "{val:?}"),
         }
     }
 }
@@ -57,15 +124,88 @@ impl<'s> From<&'s str> for AttributeValue<'s> {
     }
 }
 
-impl<'s> From<std::fmt::Arguments<'s>> for AttributeValue<'s> {
-    fn from(value: std::fmt::Arguments<'s>) -> Self {
-        AttributeValue::FmtArguments(value)
+impl<'s> From<String> for AttributeValue<'s> {
+    fn from(value: String) -> Self {
+        AttributeValue::Raw(value.into())
     }
 }
 
-impl<'s> From<&'s std::fmt::Arguments<'s>> for AttributeValue<'s> {
+impl<'s, T> From<Option<T>> for AttributeValue<'s>
+where
+    AttributeValue<'s>: From<T>,
+{
+    fn from(value: Option<T>) -> Self {
+        match value {
+            Some(value) => value.into(),
+            None => "".into(),
+        }
+    }
+}
+
+/// Store attribute values that are to be written escaped. Only meant for internal usage here to
+/// prevent some allocations.
+enum AttributeValueMore<'s> {
+    Jotdown(jotdown::AttributeValue<'s>),
+    Raw(Cow<'s, str>),
+    FmtArguments(std::fmt::Arguments<'s>),
+    Display(&'s dyn std::fmt::Display),
+}
+
+impl AttributeValueMore<'_> {
+    fn write_escaped(&self, buf: &mut String) {
+        match self {
+            AttributeValueMore::Jotdown(val) => write!(buf, "{val}").expect("infallible"),
+            AttributeValueMore::Raw(val) => pulldown_cmark_escape::escape_html(buf, val).expect("infallible"),
+            AttributeValueMore::FmtArguments(val) => write!(buf, "{val}").expect("infallible"),
+            AttributeValueMore::Display(val) => write!(buf, "{val}").expect("infallible"),
+        }
+    }
+}
+
+impl<'s> From<AttributeValue<'s>> for AttributeValueMore<'s> {
+    fn from(value: AttributeValue<'s>) -> Self {
+        match value {
+            AttributeValue::Jotdown(val) => AttributeValueMore::Jotdown(val),
+            AttributeValue::Raw(val) => AttributeValueMore::Raw(val),
+        }
+    }
+}
+
+impl<'s> From<jotdown::AttributeValue<'s>> for AttributeValueMore<'s> {
+    fn from(value: jotdown::AttributeValue<'s>) -> Self {
+        AttributeValueMore::Jotdown(value)
+    }
+}
+
+impl<'s> From<Cow<'s, str>> for AttributeValueMore<'s> {
+    fn from(value: Cow<'s, str>) -> Self {
+        AttributeValueMore::Raw(value)
+    }
+}
+
+impl<'s> From<&'s str> for AttributeValueMore<'s> {
+    fn from(value: &'s str) -> Self {
+        AttributeValueMore::Raw(value.into())
+    }
+}
+
+impl<'s> From<String> for AttributeValueMore<'s> {
+    fn from(value: String) -> Self {
+        AttributeValueMore::Raw(value.into())
+    }
+}
+
+impl<'s> From<std::fmt::Arguments<'s>> for AttributeValueMore<'s> {
+    fn from(value: std::fmt::Arguments<'s>) -> Self {
+        AttributeValueMore::FmtArguments(value)
+    }
+}
+
+impl<'s> From<&'s std::fmt::Arguments<'s>> for AttributeValueMore<'s> {
     fn from(value: &'s std::fmt::Arguments<'s>) -> Self {
-        AttributeValue::Display(value)
+        AttributeValueMore::Display(value)
+    }
+}
     }
 }
 
@@ -297,14 +437,14 @@ impl<'w> Writer<'w> {
     fn write_tag_with_attributes<'a>(
         &mut self,
         tag: &str,
-        attributes: impl IntoIterator<Item = (&'a str, AttributeValue<'a>)>,
+        attributes: impl IntoIterator<Item = (Cow<'a, str>, AttributeValueMore<'a>)>,
     ) -> Result<()> {
         self.with_buf(|buf| {
             buf.push('<');
             buf.push_str(tag);
-            for (attr, val) in attributes {
+            for (attr, val) in attributes.into_iter() {
                 buf.push(' ');
-                buf.push_str(attr);
+                buf.push_str(&attr);
                 buf.push_str(r#"=""#);
                 val.write_escaped(buf);
                 buf.push('"');
@@ -319,7 +459,7 @@ impl<'w> Writer<'w> {
     fn write_tag_with_attributes_on_new_line<'a>(
         &mut self,
         tag: &str,
-        attributes: impl IntoIterator<Item = (&'a str, AttributeValue<'a>)>,
+        attributes: impl IntoIterator<Item = (Cow<'a, str>, AttributeValueMore<'a>)>,
     ) -> Result<()> {
         self.ensure_newline()?;
         self.write_tag_with_attributes(tag, attributes)?;
@@ -362,27 +502,22 @@ impl<'w> Writer<'w> {
     fn start_tag<'s>(&mut self, bump: &Bump, container: Container<'w>, attributes: Attributes<'s>) -> Result<()> {
         use std::fmt::Write;
 
-        let attributes = {
-            let mut attributes_ = bumpalo::collections::Vec::with_capacity_in(attributes.len(), bump);
-            for (attr, value) in attributes {
-                attributes_.push((attr, AttributeValue::from(value)))
-            }
-            // ensure deterministic attribute order
-            attributes_.sort_by_key(|&(k, _)| k);
-
-            attributes_
-        };
-
         match container {
             // Container::HtmlBlock => Ok(()),
-            Container::Blockquote => self.write_tag_with_attributes_on_new_line("blockquote", attributes)?,
+            Container::Blockquote => {
+                self.write_tag_with_attributes_on_new_line("blockquote", attributes.into_iter())?
+            }
 
-            Container::DescriptionList => self.write_tag_with_attributes_on_new_line("dl", attributes)?,
-            Container::DescriptionTerm => self.write_tag_with_attributes_on_new_line("dt", attributes)?,
-            Container::DescriptionDetails => self.write_tag_with_attributes_on_new_line("dd", attributes)?,
+            Container::DescriptionList => self.write_tag_with_attributes_on_new_line("dl", attributes.into_iter())?,
+            Container::DescriptionTerm => self.write_tag_with_attributes_on_new_line("dt", attributes.into_iter())?,
+            Container::DescriptionDetails => {
+                self.write_tag_with_attributes_on_new_line("dd", attributes.into_iter())?
+            }
 
-            Container::Section { id } => self
-                .write_tag_with_attributes_on_new_line("section", attributes.into_iter().chain([("id", id.into())]))?,
+            Container::Section { id } => self.write_tag_with_attributes_on_new_line(
+                "section".into(),
+                attributes.into_iter().chain([("id".into(), id.into())]),
+            )?,
             Container::Heading { level, id } => {
                 let tag = match level {
                     1 => "h1",
@@ -392,15 +527,15 @@ impl<'w> Writer<'w> {
                     5 => "h5",
                     _ => "h6",
                 };
-                self.write_tag_with_attributes_on_new_line(tag, attributes)?;
-                self.write_tag_with_attributes("a", [("href", (&format_args!("#{id}")).into())])?;
+                self.write_tag_with_attributes_on_new_line(tag, attributes.into_iter())?;
+                self.write_tag_with_attributes("a", [("href".into(), (&format_args!("#{id}")).into())])?;
             }
             Container::Div => {
-                self.write_tag_with_attributes_on_new_line("div", attributes)?;
+                self.write_tag_with_attributes_on_new_line("div", attributes.into_iter())?;
             }
             Container::Paragraph => {
                 if !self.in_tight_list() {
-                    self.write_tag_with_attributes_on_new_line("p", attributes)?
+                    self.write_tag_with_attributes_on_new_line("p", attributes.into_iter())?
                 }
             }
 
@@ -408,14 +543,14 @@ impl<'w> Writer<'w> {
                 // TODO: escape
                 self.write_tag_with_attributes_on_new_line(
                     "a",
-                    attributes.into_iter().chain([("href", destination.into())]),
+                    attributes.into_iter().chain([("href".into(), destination.into())]),
                 )?
             }
 
             Container::List { kind, tight } => {
                 self.list_tightness.push(tight);
                 match kind {
-                    ListKind::Unordered => self.write_tag_with_attributes_on_new_line("ul", attributes)?,
+                    ListKind::Unordered => self.write_tag_with_attributes_on_new_line("ul", attributes.into_iter())?,
                     ListKind::Ordered { numbering, start } => {
                         let r#type = if matches!(numbering, OrderedListNumbering::Decimal) {
                             None
@@ -439,36 +574,35 @@ impl<'w> Writer<'w> {
                             "ol",
                             attributes
                                 .into_iter()
-                                .chain(r#type.map(|r#type| ("type", r#type.into())))
-                                .chain(start.map(|start| ("start", start.into()))),
+                                .chain(r#type.map(|r#type| ("type".into(), r#type.into())))
+                                .chain(start.map(|start| ("start".into(), start.into()))),
                         )?;
                     }
                     ListKind::Task => self.write_tag_with_attributes_on_new_line(
                         "ul",
-                        attributes.into_iter().chain([("class", "task-list".into())]),
+                        attributes.into_iter().chain([("class".into(), "task-list".into())]),
                     )?,
                 }
             }
-            Container::ListItem => self.write_tag_with_attributes_on_new_line("li", attributes)?,
+            Container::ListItem => self.write_tag_with_attributes_on_new_line("li", attributes.into_iter())?,
             Container::TaskListItem { checked } => self.write_tag_with_attributes_on_new_line(
                 "li",
                 attributes.into_iter().chain([
-                    ("class", (if checked { "checked" } else { "unchecked" }).into()),
-                    ("data-checked", (if checked { "true" } else { "false" }).into()),
+                    ("class".into(), (if checked { "checked" } else { "unchecked" }).into()),
+                    ("data-checked".into(), (if checked { "true" } else { "false" }).into()),
                 ]),
             )?,
-
-            Container::Table => self.write_tag_with_attributes_on_new_line("table", attributes)?,
-            Container::TableHead => self.write_tag_with_attributes_on_new_line("thead", attributes)?,
-            Container::TableBody => self.write_tag_with_attributes_on_new_line("tbody", attributes)?,
-            Container::TableRow => self.write_tag_with_attributes_on_new_line("tr", attributes)?,
+            Container::Table => self.write_tag_with_attributes_on_new_line("table", attributes.into_iter())?,
+            Container::TableHead => self.write_tag_with_attributes_on_new_line("thead", attributes.into_iter())?,
+            Container::TableBody => self.write_tag_with_attributes_on_new_line("tbody", attributes.into_iter())?,
+            Container::TableRow => self.write_tag_with_attributes_on_new_line("tr", attributes.into_iter())?,
             Container::TableCell { alignment, head } => {
                 let tag = if head { "th" } else { "td" };
                 let style = match alignment {
                     Alignment::Unspecified => None,
-                    Alignment::Left => Some(("style", AttributeValue::from("text-align: left;"))),
-                    Alignment::Center => Some(("style", AttributeValue::from("text-align: center;"))),
-                    Alignment::Right => Some(("style", AttributeValue::from("text-align: right;"))),
+                    Alignment::Left => Some(("style".into(), AttributeValueMore::from("text-align: left;"))),
+                    Alignment::Center => Some(("style".into(), AttributeValueMore::from("text-align: center;"))),
+                    Alignment::Right => Some(("style".into(), AttributeValueMore::from("text-align: right;"))),
                 };
                 self.write_tag_with_attributes_on_new_line(tag, style)?
             }
@@ -479,14 +613,16 @@ impl<'w> Writer<'w> {
                 self.write_tag_with_attributes_on_new_line(
                     "li",
                     attributes.into_iter().chain([
-                        ("class", "footnote-definition".into()),
-                        ("id", (&format_args!("fn-{num}")).into()),
-                        ("role", "doc-footnote".into()),
+                        ("class".into(), "footnote-definition".into()),
+                        ("id".into(), (&format_args!("fn-{num}")).into()),
+                        ("role".into(), "doc-footnote".into()),
                     ]),
                 )?;
             }
 
-            Container::Other { tag } => self.write_tag_with_attributes_on_new_line(tag.as_ref(), attributes)?,
+            Container::Other { tag } => {
+                self.write_tag_with_attributes_on_new_line(tag.as_ref(), attributes.into_iter())?
+            }
         }
 
         Ok(())
@@ -556,24 +692,6 @@ impl<'w> Writer<'w> {
     }
 }
 
-/// Sort jotdown attributes into an attribute vec with deterministic attribute order
-fn sort_attributes<'a, 's>(
-    bump: &'a Bump,
-    attributes: jotdown::Attributes<'s>,
-) -> bumpalo::collections::Vec<'a, (&'s str, AttributeValue<'s>)>
-where
-    's: 'a,
-{
-    let mut attributes_ = bumpalo::collections::Vec::with_capacity_in(attributes.len(), bump);
-    for (attr, value) in attributes {
-        attributes_.push((attr, AttributeValue::from(value)))
-    }
-    // ensure deterministic attribute order
-    attributes_.sort_by_key(|&(k, _)| k);
-
-    attributes_
-}
-
 pub fn push_html<'s>(
     buf: &mut String,
     mut iter: impl Iterator<Item = Event<'s>>,
@@ -620,48 +738,43 @@ pub fn push_html<'s>(
                     style = Some(bumpalo::format!(in &bump, "max-width: calc(min(100%, {}px))", width).into_bump_str());
                 }
 
-                let attributes = sort_attributes(&bump, attributes);
                 writer.write_tag_with_attributes_on_new_line(
                     "img",
                     attributes
                         .into_iter()
-                        .chain([("src", destination.into())])
-                        .chain(srcset.map(|srcset| ("srcset", srcset.into())))
-                        .chain(style.map(|style| ("style", style.into())))
-                        .chain((alt == "").then(|| ("alt", alt.into()))),
+                        .chain([("src".into(), destination.into())])
+                        .chain(srcset.map(|srcset| ("srcset".into(), srcset.into())))
+                        .chain(style.map(|style| ("style".into(), style.into())))
+                        .chain((alt == "").then(|| ("alt".into(), alt.into()))),
                 )?
             }
             Event::CodeBlock {
                 language,
                 code,
                 attributes,
-            } => {
-                let attributes = sort_attributes(&bump, attributes);
-                match highlight::highlight(&code, &language)? {
-                    highlight::Highlighted::Plain(plaintext) => {
-                        writer.write_tag_with_attributes_on_new_line("pre", attributes)?;
-                        writer.write_on_new_line("<code>")?;
-                        writer.write_on_new_line(&plaintext)?;
-                        writer.write_on_new_line("</code>\n</pre>")?;
-                    }
-                    highlight::Highlighted::Highlighted { language, highlighted } => {
-                        writer.write_tag_with_attributes_on_new_line(
-                            "pre",
-                            attributes.into_iter().chain([("class", "highlight".into())]),
-                        )?;
-                        writer.write_tag_with_attributes_on_new_line("code", [("data-lang", language.into())])?;
-                        writer.write_on_new_line(&highlighted)?;
-                        writer.write_on_new_line("</code>\n</pre>")?;
-                    }
+            } => match highlight::highlight(&code, &language)? {
+                highlight::Highlighted::Plain(plaintext) => {
+                    writer.write_tag_with_attributes_on_new_line("pre", attributes.into_iter())?;
+                    writer.write_on_new_line("<code>")?;
+                    writer.write_on_new_line(&plaintext)?;
+                    writer.write_on_new_line("</code>\n</pre>")?;
                 }
-            }
+                highlight::Highlighted::Highlighted { language, highlighted } => {
+                    writer.write_tag_with_attributes_on_new_line(
+                        "pre",
+                        attributes.into_iter().chain([("class".into(), "highlight".into())]),
+                    )?;
+                    writer.write_tag_with_attributes_on_new_line("code", [("data-lang".into(), language.into())])?;
+                    writer.write_on_new_line(&highlighted)?;
+                    writer.write_on_new_line("</code>\n</pre>")?;
+                }
+            },
 
             #[allow(unused_variables)]
             Event::Math { kind, math, attributes } => {
-                let attributes = sort_attributes(&bump, attributes);
                 writer.write_tag_with_attributes_on_new_line(
                     "span",
-                    attributes.into_iter().chain([("class", "math".into())]),
+                    attributes.into_iter().chain([("class".into(), "math".into())]),
                 )?;
                 #[cfg(any(feature = "katex", feature = "latex2mathml"))]
                 {
@@ -674,20 +787,21 @@ pub fn push_html<'s>(
                 writer.write("</span>")?;
             }
             Event::HtmlBlock { content, attributes } => {
-                let attributes = sort_attributes(&bump, attributes);
-                writer.write_tag_with_attributes_on_new_line("div", attributes)?;
+                writer.write_tag_with_attributes_on_new_line("div", attributes.into_iter())?;
                 writer.write(&content)?;
                 writer.write("</div>\n")?
             }
             Event::HtmlInline { content, attributes } => {
-                let attributes = sort_attributes(&bump, attributes);
-                writer.write_tag_with_attributes_on_new_line("div", attributes)?;
-                writer.write(&content)?;
-                writer.write("</div>\n")?
+                if attributes.is_empty() {
+                    writer.write(&content)?;
+                } else {
+                    writer.write_tag_with_attributes_on_new_line("span", attributes.into_iter())?;
+                    writer.write(&content)?;
+                    writer.write("</span>\n")?
+                }
             }
             Event::TagWithAttribute { tag, attributes } => {
-                let attributes = sort_attributes(&bump, attributes);
-                writer.write_tag_with_attributes_on_new_line(tag.as_ref(), attributes)?
+                writer.write_tag_with_attributes_on_new_line(tag.as_ref(), attributes.into_iter())?
             }
 
             Event::FootnoteReference { reference } => {
@@ -696,8 +810,8 @@ pub fn push_html<'s>(
                 writer.write_tag_with_attributes(
                     "a",
                     [
-                        ("role", "doc-noteref".into()),
-                        ("href", (&format_args!("#fn-{num}")).into()),
+                        ("role".into(), "doc-noteref".into()),
+                        ("href".into(), (&format_args!("#fn-{num}")).into()),
                     ],
                 )?;
                 writer.with_buf(|buf| write!(buf, "{num}"))?;
@@ -734,9 +848,9 @@ pub fn push_html<'s>(
                     writer.write_tag_with_attributes_on_new_line(
                         "li",
                         [
-                            ("class", "footnote-definition".into()),
-                            ("id", (&format_args!("fn-{num}")).into()),
-                            ("role", "doc-footnote".into()),
+                            ("class".into(), "footnote-definition".into()),
+                            ("id".into(), (&format_args!("fn-{num}")).into()),
+                            ("role".into(), "doc-footnote".into()),
                         ],
                     )?;
                 }
@@ -913,4 +1027,38 @@ pub fn rewrite_and_emit_internal_links<'entries>(
     }
 
     Ok(internal_links)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::borrow::Cow;
+
+    use super::{AttributeValue, Attributes};
+
+    #[test]
+    fn attr_alphabetical() {
+        let mut attributes = Attributes::new();
+
+        attributes.push("foo", "");
+        attributes.push("bar", "");
+        attributes.push("qux", "");
+        attributes.push("cafe", "");
+
+        let mut iter = attributes.into_iter();
+        assert_eq!(iter.next().unwrap().0, Cow::from("bar"));
+        assert_eq!(iter.next().unwrap().0, Cow::from("cafe"));
+        assert_eq!(iter.next().unwrap().0, Cow::from("foo"));
+        assert_eq!(iter.next().unwrap().0, Cow::from("qux"));
+        assert!(iter.next().is_none());
+    }
+
+    #[test]
+    fn attr_override() {
+        let mut attributes = Attributes::new();
+
+        attributes.push("foo", "");
+        assert_eq!(attributes.get("foo").unwrap(), &AttributeValue::Raw("".into()),);
+        attributes.push("foo", "bar");
+        assert_eq!(attributes.get("foo").unwrap(), &AttributeValue::Raw("bar".into()),);
+    }
 }
