@@ -20,6 +20,8 @@ pub enum Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// Block element attributes. This struct keeps attributes ordered deterministically by their key.
+/// Equality of attribute structs is invariant over key insertion order.
 #[derive(Clone, Debug)]
 pub struct Attributes<'s> {
     attributes: Vec<(Cow<'s, str>, AttributeValue<'s>)>,
