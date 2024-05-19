@@ -99,7 +99,21 @@ impl From<Alignment> for IrAlignment {
     }
 }
 
+struct Context {
+    table_row_index: usize,
+}
+
+impl Context {
+    fn new() -> Self {
+        Context {
+            table_row_index: 0,
+        }
+    }
+}
+
 pub fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterator<Item = IrEvent<'s>> {
+    let mut ctx = Context::new();
+
     // to be replaced by `gen`-blocks
     genawaiter::rc::Gen::new(|co| async move {
         while let Some(ev) = djot.next() {
@@ -340,14 +354,10 @@ pub fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterato
                 }
 
                 Event::Start(Container::Table, attributes) => {
+                    ctx.table_row_index = 0;
                     co.yield_(IrEvent::Start {
                         container: IrContainer::Table,
                         attributes: attributes.into(),
-                    })
-                    .await;
-                    co.yield_(IrEvent::Start {
-                        container: IrContainer::TableBody,
-                        attributes: IrAttributes::new(),
                     })
                     .await;
                 }
@@ -361,18 +371,47 @@ pub fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterato
                     })
                     .await;
                 }
-                Event::Start(Container::TableRow { head: _ }, attributes) => {
+                Event::Start(Container::TableRow { head }, attributes) => {
+                    if ctx.table_row_index == 0 {
+                        if head {
+                            co.yield_(IrEvent::Start {
+                                container: IrContainer::TableHead,
+                                attributes: IrAttributes::new(),
+                            })
+                            .await;
+                        } else {
+                            co.yield_(IrEvent::Start {
+                                container: IrContainer::TableBody,
+                                attributes: IrAttributes::new(),
+                            })
+                            .await;
+                        }
+                    }
+
                     co.yield_(IrEvent::Start {
                         container: IrContainer::TableRow,
                         attributes: attributes.into(),
                     })
                     .await
                 }
-                Event::End(Container::TableRow { head: _ }) => {
+                Event::End(Container::TableRow { head }) => {
                     co.yield_(IrEvent::End {
                         container: IrContainerEnd::TableRow,
                     })
-                    .await
+                    .await;
+
+                    if ctx.table_row_index == 0 && head {
+                        co.yield_(IrEvent::End {
+                            container: IrContainerEnd::TableHead,
+                        })
+                        .await;
+                        co.yield_(IrEvent::Start {
+                            container: IrContainer::TableBody,
+                            attributes: IrAttributes::new(),
+                        })
+                        .await;
+                    }
+                    ctx.table_row_index += 1;
                 }
                 Event::Start(Container::TableCell { alignment, head }, attributes) => {
                     co.yield_(IrEvent::Start {
@@ -778,7 +817,7 @@ I. item 2
     }
 
     #[test]
-    fn table() {
+    fn table_with_head() {
         test(
             r##"
 | head 1 | head 2 |
@@ -786,11 +825,13 @@ I. item 2
 | cell 1 | cell 2 |
 "##,
             r##"<table>
-<tbody>
+<thead>
 <tr>
 <th>head 1</th>
 <th style="text-align: right;">head 2</th>
 </tr>
+</thead>
+<tbody>
 <tr>
 <td>cell 1</td>
 <td style="text-align: right;">cell 2</td>
@@ -799,5 +840,50 @@ I. item 2
 </table>
 "##,
         )
+    }
+
+    #[test]
+    fn table_without_head() {
+        test(
+            r##"
+|--|--:|
+| head 1 | head 2 |
+| cell 1 | cell 2 |
+"##,
+            r##"<table>
+<tbody>
+<tr>
+<td>head 1</td>
+<td style="text-align: right;">head 2</td>
+</tr>
+<tr>
+<td>cell 1</td>
+<td style="text-align: right;">cell 2</td>
+</tr>
+</tbody>
+</table>
+"##,
+        );
+
+        test(
+            r##"
+| head 1 | head 2 |
+| cell 1 | cell 2 |
+|--|--:|
+"##,
+            r##"<table>
+<tbody>
+<tr>
+<td>head 1</td>
+<td>head 2</td>
+</tr>
+<tr>
+<th>cell 1</th>
+<th style="text-align: right;">cell 2</th>
+</tr>
+</tbody>
+</table>
+"##,
+        );
     }
 }
