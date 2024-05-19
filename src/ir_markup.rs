@@ -209,7 +209,52 @@ impl<'s> From<&'s std::fmt::Arguments<'s>> for AttributeValuePlusFmt<'s> {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HeadingLevel {
+    H1,
+    H2,
+    H3,
+    H4,
+    H5,
+    H6,
+}
+
+impl HeadingLevel {
+    pub fn tag(self) -> &'static str {
+        match self {
+            HeadingLevel::H1 => "h1",
+            HeadingLevel::H2 => "h2",
+            HeadingLevel::H3 => "h3",
+            HeadingLevel::H4 => "h4",
+            HeadingLevel::H5 => "h5",
+            HeadingLevel::H6 => "h6",
+        }
+    }
+}
+
+impl std::fmt::Display for HeadingLevel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.tag())
+    }
+}
+
+impl TryFrom<u16> for HeadingLevel {
+    type Error = ();
+
+    fn try_from(value: u16) -> std::result::Result<Self, ()> {
+        match value {
+            1 => Ok(HeadingLevel::H1),
+            2 => Ok(HeadingLevel::H2),
+            3 => Ok(HeadingLevel::H3),
+            4 => Ok(HeadingLevel::H4),
+            5 => Ok(HeadingLevel::H5),
+            6 => Ok(HeadingLevel::H6),
+            _ => Err(()),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Alignment {
     Unspecified,
     Left,
@@ -250,7 +295,7 @@ pub enum Container<'s> {
     DescriptionTerm,
     DescriptionDetails,
 
-    Heading { level: u16, id: Cow<'s, str> },
+    Heading { level: HeadingLevel, id: Cow<'s, str> },
     Section { id: Cow<'s, str> },
     Div,
     Paragraph,
@@ -280,7 +325,7 @@ pub enum ContainerEnd<'s> {
     DescriptionTerm,
     DescriptionDetails,
 
-    Heading { level: u16 },
+    Heading { level: HeadingLevel },
     Section,
     Div,
     Paragraph,
@@ -519,15 +564,7 @@ impl<'w> Writer<'w> {
                 attributes.into_iter().chain([("id".into(), id.into())]),
             )?,
             Container::Heading { level, id } => {
-                let tag = match level {
-                    1 => "h1",
-                    2 => "h2",
-                    3 => "h3",
-                    4 => "h4",
-                    5 => "h5",
-                    _ => "h6",
-                };
-                self.write_tag_with_attributes_on_new_line(tag, attributes.into_iter())?;
+                self.write_tag_with_attributes_on_new_line(level.tag(), attributes.into_iter())?;
                 self.write_tag_with_attributes("a", [("href".into(), (&format_args!("#{id}")).into())])?;
             }
             Container::Div => {
@@ -637,15 +674,7 @@ impl<'w> Writer<'w> {
             ContainerEnd::DescriptionDetails => self.write("</dd>")?,
 
             ContainerEnd::Heading { level } => {
-                let write = match level {
-                    1 => "</a></h1>\n",
-                    2 => "</a></h2>\n",
-                    3 => "</a></h3>\n",
-                    4 => "</a></h4>\n",
-                    5 => "</a></h5>\n",
-                    _ => "</a></h6>\n",
-                };
-                self.write(write)?;
+                self.with_buf(|buf| write!(buf, "</a></{level}>\n"))?;
             }
             ContainerEnd::Section => self.write("</section>\n")?,
             ContainerEnd::Div => self.write("</div>\n")?,
@@ -966,7 +995,10 @@ pub fn parse_and_render_title(events: &mut Vec<Event<'_>>) -> anyhow::Result<Opt
         if matches!(
             iter.next(),
             Some(Event::Start {
-                container: Container::Heading { level: 1, id: _ },
+                container: Container::Heading {
+                    level: HeadingLevel::H1,
+                    id: _
+                },
                 attributes: _
             })
         ) {

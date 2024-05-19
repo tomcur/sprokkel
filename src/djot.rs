@@ -181,7 +181,11 @@ pub fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterato
                     attributes,
                 ) => {
                     co.yield_(IrEvent::Start {
-                        container: IrContainer::Heading { level, id },
+                        container: IrContainer::Heading {
+                            // TODO: remove unwrap
+                            level: level.try_into().unwrap(),
+                            id,
+                        },
                         attributes: attributes.into(),
                     })
                     .await
