@@ -152,7 +152,7 @@ fn build(ctx: &Ctx, path: &Path, renderer: &render::Renderer) -> anyhow::Result<
 
     let mut parsed: Vec<Vec<ir_markup::Event<'_>>> = content
         .par_iter()
-        .map(|content| djot::djot_to_ir(jotdown::Parser::new(content)).collect())
+        .map(|content| djot::parse(content).collect())
         .collect();
 
     // Parse entry front matter, consuming the front matter events from `parsed`

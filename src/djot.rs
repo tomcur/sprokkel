@@ -111,7 +111,7 @@ impl Context {
     }
 }
 
-pub fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterator<Item = IrEvent<'s>> {
+fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterator<Item = IrEvent<'s>> {
     let mut ctx = Context::new();
 
     // to be replaced by `gen`-blocks
@@ -627,6 +627,10 @@ pub fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterato
         }
     })
     .into_iter()
+}
+
+pub fn parse<'s>(input: &'s str) -> impl Iterator<Item = IrEvent<'s>> {
+    djot_to_ir(jotdown::Parser::new(input))
 }
 
 #[cfg(test)]
