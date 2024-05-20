@@ -28,6 +28,8 @@ pub struct Attributes<'s> {
 }
 
 impl<'s> Attributes<'s> {
+    /// Create a new attribute set. This does not allocate. Inserting items will allocate. If you
+    /// know roughly how many attributes are to be expected, consider using [Self::with_capacity].
     pub fn new() -> Self {
         Attributes { attributes: Vec::new() }
     }
