@@ -297,25 +297,42 @@ pub enum Container<'s> {
     DescriptionTerm,
     DescriptionDetails,
 
-    Heading { level: HeadingLevel, id: Cow<'s, str> },
-    Section { id: Cow<'s, str> },
+    Heading {
+        level: HeadingLevel,
+        id: Option<Cow<'s, str>>,
+    },
+    Section {
+        id: Option<Cow<'s, str>>,
+    },
     Div,
     Paragraph,
 
-    Link { destination: Cow<'s, str> },
+    Link {
+        destination: Cow<'s, str>,
+    },
 
-    List { kind: ListKind, tight: bool },
+    List {
+        kind: ListKind,
+        tight: bool,
+    },
     ListItem,
 
     Table,
     TableHead,
     TableBody,
     TableRow,
-    TableCell { alignment: Alignment, head: bool },
+    TableCell {
+        alignment: Alignment,
+        head: bool,
+    },
 
-    Footnote { label: Cow<'s, str> },
+    Footnote {
+        label: Cow<'s, str>,
+    },
 
-    Other { tag: Cow<'s, str> },
+    Other {
+        tag: Cow<'s, str>,
+    },
 }
 
 #[derive(Clone, Debug)]
@@ -326,7 +343,7 @@ pub enum ContainerEnd<'s> {
     DescriptionTerm,
     DescriptionDetails,
 
-    Heading { level: HeadingLevel },
+    Heading { level: HeadingLevel, has_id: bool },
     Section,
     Div,
     Paragraph,
@@ -563,11 +580,13 @@ impl<'w> Writer<'w> {
 
             Container::Section { id } => self.write_tag_with_attributes_on_new_line(
                 "section".into(),
-                attributes.into_iter().chain([("id".into(), id.into())]),
+                attributes.into_iter().chain(id.map(|id| ("id".into(), id.into()))),
             )?,
             Container::Heading { level, id } => {
                 self.write_tag_with_attributes_on_new_line(level.tag(), attributes.into_iter())?;
-                self.write_tag_with_attributes("a", [("href".into(), (&format_args!("#{id}")).into())])?;
+                if let Some(id) = id {
+                    self.write_tag_with_attributes("a", [("href".into(), (&format_args!("#{id}")).into())])?;
+                }
             }
             Container::Div => {
                 self.write_tag_with_attributes_on_new_line("div", attributes.into_iter())?;
@@ -675,8 +694,13 @@ impl<'w> Writer<'w> {
             ContainerEnd::DescriptionTerm => self.write("</dt>")?,
             ContainerEnd::DescriptionDetails => self.write("</dd>")?,
 
-            ContainerEnd::Heading { level } => {
-                self.with_buf(|buf| write!(buf, "</a></{level}>\n"))?;
+            ContainerEnd::Heading { level, has_id } => {
+                self.with_buf(|buf| {
+                    if has_id {
+                        write!(buf, "</a>")?;
+                    }
+                    write!(buf, "</{level}>\n")
+                })?;
             }
             ContainerEnd::Section => self.write("</section>\n")?,
             ContainerEnd::Div => self.write("</div>\n")?,

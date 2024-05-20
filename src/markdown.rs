@@ -71,11 +71,42 @@ enum TableHeadOrBody {
     Body,
 }
 
+fn heading_level_to_num(level: HeadingLevel) -> u8 {
+    match level {
+        HeadingLevel::H1 => 0,
+        HeadingLevel::H2 => 1,
+        HeadingLevel::H3 => 2,
+        HeadingLevel::H4 => 3,
+        HeadingLevel::H5 => 4,
+        HeadingLevel::H6 => 5,
+    }
+}
+
+/// From heading level to whether it has an id
+struct HeadingHasIdBitfield(u8);
+
+impl HeadingHasIdBitfield {
+    fn set(&mut self, level: HeadingLevel, set: bool) {
+        let n = heading_level_to_num(level);
+
+        self.0 &= !(1 << n);
+        self.0 |= (set as u8) << n;
+    }
+
+    fn get(&self, level: HeadingLevel) -> bool {
+        let n = heading_level_to_num(level);
+
+        (self.0 & (1 << n)) > 0
+    }
+}
+
 struct Context {
     table_alignment: Vec<pulldown_cmark::Alignment>,
     table_cell_idx: usize,
     table_head_or_body: TableHeadOrBody,
     section_stack: Vec<HeadingLevel>,
+
+    heading_has_id: HeadingHasIdBitfield,
 }
 
 impl Context {
@@ -85,6 +116,7 @@ impl Context {
             table_cell_idx: 0,
             table_head_or_body: TableHeadOrBody::Head,
             section_stack: Vec::with_capacity(6),
+            heading_has_id: HeadingHasIdBitfield(0),
         }
     }
 }
@@ -130,12 +162,6 @@ fn markdown_to_ir<'s>(mut markdown: impl Iterator<Item = Event<'s>>) -> impl Ite
                             attributes.insert("class", class);
                         }
                     }
-                    // for (attr, val) in attrs {
-                    //     attributes.insert(
-                    //         Cow::from(attr),
-                    //         val.map(|val| Cow::from(val)).unwrap_or(Cow::Borrowed("")).into(),
-                    //     )
-                    // }
 
                     while let Some(&open_section_level) = ctx.section_stack.last() {
                         if level <= open_section_level {
@@ -150,18 +176,18 @@ fn markdown_to_ir<'s>(mut markdown: impl Iterator<Item = Event<'s>>) -> impl Ite
                         }
                     }
                     ctx.section_stack.push(level);
+                    ctx.heading_has_id.set(level, id.is_some());
 
+                    let id = id.map(Cow::from);
                     co.yield_(IrEvent::Start {
-                        container: IrContainer::Section {
-                            id: id.clone().unwrap_or("".into()).into(),
-                        },
+                        container: IrContainer::Section { id: id.clone() },
                         attributes: Attributes::new(),
                     })
                     .await;
                     co.yield_(IrEvent::Start {
                         container: IrContainer::Heading {
                             level: level.into(),
-                            id: id.unwrap_or("".into()).into(),
+                            id,
                         },
                         attributes: Attributes::new(),
                     })
@@ -169,7 +195,10 @@ fn markdown_to_ir<'s>(mut markdown: impl Iterator<Item = Event<'s>>) -> impl Ite
                 }
                 Event::End(TagEnd::Heading(level)) => {
                     co.yield_(IrEvent::End {
-                        container: IrContainerEnd::Heading { level: level.into() },
+                        container: IrContainerEnd::Heading {
+                            level: level.into(),
+                            has_id: ctx.heading_has_id.get(level),
+                        },
                     })
                     .await;
                 }
@@ -538,6 +567,23 @@ mod test {
         let ir = parse(input);
         ir_markup::push_html(&mut s, ir, &HashMap::new()).unwrap();
         assert_eq!(s, output);
+    }
+
+    #[test]
+    fn bitfield() {
+        use pulldown_cmark::HeadingLevel as L;
+
+        use super::HeadingHasIdBitfield;
+
+        let mut b = HeadingHasIdBitfield(0);
+        b.set(L::H1, false);
+        assert_eq!(b.0, 0b0000_0000);
+        b.set(L::H1, true);
+        assert_eq!(b.0, 0b0000_0001);
+        b.set(L::H4, true);
+        assert_eq!(b.0, 0b0000_1001);
+        b.set(L::H4, false);
+        assert_eq!(b.0, 0b0000_0001);
     }
 
     #[test]

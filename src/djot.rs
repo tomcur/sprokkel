@@ -182,7 +182,7 @@ fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterator<It
                         container: IrContainer::Heading {
                             // TODO: remove unwrap
                             level: level.try_into().unwrap(),
-                            id,
+                            id: Some(id),
                         },
                         attributes: attributes.into(),
                     })
@@ -197,13 +197,14 @@ fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterator<It
                         container: IrContainerEnd::Heading {
                             // TODO: remove unwrap
                             level: level.try_into().unwrap(),
+                            has_id: true,
                         },
                     })
                     .await
                 }
                 Event::Start(Container::Section { id }, attributes) => {
                     co.yield_(IrEvent::Start {
-                        container: IrContainer::Section { id },
+                        container: IrContainer::Section { id: Some(id) },
                         attributes: attributes.into(),
                     })
                     .await
