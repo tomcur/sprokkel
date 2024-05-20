@@ -1,6 +1,7 @@
 Sprokkel is a lightweight static site generator. It supports:
 
-- writing in [Djot markup](https://github.com/jgm/djot)
+- writing in [Djot](https://github.com/jgm/djot) and [CommonMark-compliant
+  Markdown](https://commonmark.org) markup languages
 - [Tree-sitter](https://tree-sitter.github.io/tree-sitter)-based code syntax
   highlighting
 - compile-time LaTeX to to MathML rendering
