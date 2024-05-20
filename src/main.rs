@@ -58,10 +58,10 @@ fn collect_entries<'a>(
         .filter_map(move |entry| match entry {
             Ok(entry) => {
                 let name = entry.path().to_str()?;
-                if entry.file_type().is_dir() || !name.ends_with(".dj") {
-                    None
-                } else {
+                if entry.file_type().is_file() && name.ends_with(".dj") {
                     Some(types::EntryMeta::entry_from_path(ctx, path_prefix, entry.path()))
+                } else {
+                    None
                 }
             }
             Err(err) => Some(Err(err.into())),
