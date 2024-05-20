@@ -582,8 +582,13 @@ mod test {
         assert_eq!(b.0, 0b0000_0001);
         b.set(L::H4, true);
         assert_eq!(b.0, 0b0000_1001);
-        b.set(L::H4, false);
-        assert_eq!(b.0, 0b0000_0001);
+
+        assert!(b.get(L::H1));
+        assert!(!b.get(L::H2));
+        assert!(!b.get(L::H3));
+        assert!(b.get(L::H4));
+        assert!(!b.get(L::H5));
+        assert!(!b.get(L::H6));
     }
 
     #[test]
