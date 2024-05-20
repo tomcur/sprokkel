@@ -549,8 +549,6 @@ impl<'w> Writer<'w> {
     }
 
     fn start_tag<'s>(&mut self, bump: &Bump, container: Container<'w>, attributes: Attributes<'s>) -> Result<()> {
-        use std::fmt::Write;
-
         match container {
             // Container::HtmlBlock => Ok(()),
             Container::Blockquote => {
