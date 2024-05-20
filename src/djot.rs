@@ -105,9 +105,7 @@ struct Context {
 
 impl Context {
     fn new() -> Self {
-        Context {
-            table_row_index: 0,
-        }
+        Context { table_row_index: 0 }
     }
 }
 
@@ -345,14 +343,15 @@ fn djot_to_ir<'s>(mut djot: impl Iterator<Item = Event<'s>>) -> impl Iterator<It
                 }
                 Event::Start(Container::TaskListItem { checked }, attributes) => {
                     co.yield_(IrEvent::Start {
-                        container: IrContainer::TaskListItem { checked },
+                        container: IrContainer::ListItem,
                         attributes: attributes.into(),
                     })
-                    .await
+                    .await;
+                    co.yield_(IrEvent::TaskListMarker { checked }).await
                 }
                 Event::End(Container::TaskListItem { checked: _ }) => {
                     co.yield_(IrEvent::End {
-                        container: IrContainerEnd::TaskListItem,
+                        container: IrContainerEnd::ListItem,
                     })
                     .await
                 }
@@ -803,8 +802,12 @@ I. item 2
 - [x] checked
 "##,
             r##"<ul class="task-list">
-<li class="unchecked" data-checked="false">unchecked</li>
-<li class="checked" data-checked="true">checked</li>
+<li>
+<input type="checkbox" disabled="">
+unchecked</li>
+<li>
+<input type="checkbox" disabled="" checked="">
+checked</li>
 </ul>
 "##,
         )

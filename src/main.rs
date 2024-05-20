@@ -16,13 +16,17 @@ mod front_matter;
 mod highlight;
 mod images;
 mod ir_markup;
+mod markdown;
 mod out;
 mod render;
+mod tests;
 mod types;
 mod utils;
 
 use ctx::Ctx;
 use out::Out;
+
+use crate::types::EntrySourceKind;
 
 #[derive(Debug)]
 struct Group {
@@ -58,7 +62,7 @@ fn collect_entries<'a>(
         .filter_map(move |entry| match entry {
             Ok(entry) => {
                 let name = entry.path().to_str()?;
-                if entry.file_type().is_file() && name.ends_with(".dj") {
+                if entry.file_type().is_file() && (name.ends_with(".dj") || name.ends_with(".md")) {
                     Some(types::EntryMeta::entry_from_path(ctx, path_prefix, entry.path()))
                 } else {
                     None
@@ -150,9 +154,13 @@ fn build(ctx: &Ctx, path: &Path, renderer: &render::Renderer) -> anyhow::Result<
         (content, front_matter)
     };
 
-    let mut parsed: Vec<Vec<ir_markup::Event<'_>>> = content
+    let mut parsed: Vec<Vec<ir_markup::Event<'_>>> = entries
         .par_iter()
-        .map(|content| djot::parse(content).collect())
+        .zip(content)
+        .map(|(entry, content)| match entry.source_kind {
+            EntrySourceKind::Djot => djot::parse(content).collect(),
+            EntrySourceKind::CommonMark => markdown::parse(content).collect(),
+        })
         .collect();
 
     // Parse entry front matter, consuming the front matter events from `parsed`

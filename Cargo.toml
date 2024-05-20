@@ -30,6 +30,7 @@ walkdir = "2.5"
 bumpalo = { version = "3.16", features = ["collections"] }
 genawaiter = { version = "0.99", features = ["proc_macro"] }
 jotdown = "0.4"
+pulldown-cmark = "0.10.1"
 pulldown-cmark-escape = "0.10.1"
 
 log = "0.4"

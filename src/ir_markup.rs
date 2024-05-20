@@ -304,7 +304,6 @@ pub enum Container<'s> {
 
     List { kind: ListKind, tight: bool },
     ListItem,
-    TaskListItem { checked: bool },
 
     Table,
     TableHead,
@@ -334,7 +333,6 @@ pub enum ContainerEnd<'s> {
 
     List { kind: ListKind },
     ListItem,
-    TaskListItem,
 
     Table,
     TableHead,
@@ -383,6 +381,10 @@ pub enum Event<'s> {
     TagWithAttribute {
         tag: Cow<'s, str>,
         attributes: Attributes<'s>,
+    },
+
+    TaskListMarker {
+        checked: bool,
     },
 
     FootnoteReference {
@@ -622,13 +624,13 @@ impl<'w> Writer<'w> {
                 }
             }
             Container::ListItem => self.write_tag_with_attributes_on_new_line("li", attributes.into_iter())?,
-            Container::TaskListItem { checked } => self.write_tag_with_attributes_on_new_line(
-                "li",
-                attributes.into_iter().chain([
-                    ("class".into(), (if checked { "checked" } else { "unchecked" }).into()),
-                    ("data-checked".into(), (if checked { "true" } else { "false" }).into()),
-                ]),
-            )?,
+            // Container::TaskListItem { checked } => self.write_tag_with_attributes_on_new_line(
+            //     "li",
+            //     attributes.into_iter().chain([
+            //         ("class", (if checked { "checked" } else { "unchecked" }).into()),
+            //         ("data-checked", (if checked { "true" } else { "false" }).into()),
+            //     ]),
+            // )?,
             Container::Table => self.write_tag_with_attributes_on_new_line("table", attributes.into_iter())?,
             Container::TableHead => self.write_tag_with_attributes_on_new_line("thead", attributes.into_iter())?,
             Container::TableBody => self.write_tag_with_attributes_on_new_line("tbody", attributes.into_iter())?,
@@ -692,7 +694,7 @@ impl<'w> Writer<'w> {
                     ListKind::Ordered { numbering: _, start: _ } => self.write("</ol>\n")?,
                 }
             }
-            ContainerEnd::ListItem | ContainerEnd::TaskListItem => self.write("</li>\n")?,
+            ContainerEnd::ListItem => self.write("</li>\n")?,
 
             ContainerEnd::Table => self.write("</table>\n")?,
             ContainerEnd::TableHead => self.write("</thead>\n")?,
@@ -831,6 +833,16 @@ pub fn push_html<'s>(
             }
             Event::TagWithAttribute { tag, attributes } => {
                 writer.write_tag_with_attributes_on_new_line(tag.as_ref(), attributes.into_iter())?
+            }
+
+            Event::TaskListMarker { checked } => {
+                writer.write_tag_with_attributes_on_new_line(
+                    "input",
+                    [("type".into(), "checkbox".into()), ("disabled".into(), "".into())]
+                        .into_iter()
+                        .chain(checked.then(|| ("checked".into(), "".into()))),
+                )?;
+                writer.write("\n")?;
             }
 
             Event::FootnoteReference { reference } => {

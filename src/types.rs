@@ -29,11 +29,7 @@ pub struct Time {
 
 impl Time {
     pub fn new(hour: u8, minute: u8, second: u8) -> Self {
-        Time {
-            hour,
-            minute,
-            second,
-        }
+        Time { hour, minute, second }
     }
 }
 
@@ -64,10 +60,7 @@ fn parse_date_time(value: &str) -> Result<(Date, Option<Time>), ()> {
         let minute = (time - hour * 1_00_00) / 1_00;
         let second = time - hour * 1_00_00 - minute * 1_00;
 
-        Ok((
-            date,
-            Some(Time::new(hour as u8, minute as u8, second as u8)),
-        ))
+        Ok((date, Some(Time::new(hour as u8, minute as u8, second as u8))))
     } else {
         Ok((date, None))
     }
@@ -95,6 +88,12 @@ pub struct Images {
 }
 
 #[derive(Debug, serde::Serialize)]
+pub enum EntrySourceKind {
+    Djot,
+    CommonMark,
+}
+
+#[derive(Debug, serde::Serialize)]
 pub struct EntryMeta {
     /// Date is set for entries whose filenames' start with a date in the format `yyyy-mm-dd`
     #[serde(skip)]
@@ -103,6 +102,7 @@ pub struct EntryMeta {
     pub time: Option<Time>,
     pub group: String,
     pub slug: String,
+    pub source_kind: EntrySourceKind,
     /// e.g., `posts/2024-10-02-foo-bar.dj`, `posts/2024-10-02-foo-bar/index.dj` or
     /// `pages/baz.dj`
     #[serde(skip)]
@@ -158,6 +158,12 @@ pub struct Entry<'m> {
 
 impl EntryMeta {
     pub fn entry_from_path(ctx: &Ctx, path_prefix: &Path, path: &Path) -> anyhow::Result<Self> {
+        let source_kind = match path.extension().map(std::ffi::OsStr::as_encoded_bytes) {
+            Some(b"dj") => EntrySourceKind::Djot,
+            Some(b"md") => EntrySourceKind::CommonMark,
+            _ => anyhow::bail!("Expected entry filename extension to be .dj or .md"),
+        };
+
         let mut path_without_prefix = path.strip_prefix(path_prefix)?.iter();
         let group = path_without_prefix
             .next()
@@ -179,9 +185,7 @@ impl EntryMeta {
                 .to_owned()
         };
 
-        let parent_dir = path
-            .parent()
-            .ok_or(anyhow!("expected file with parent dir"))?;
+        let parent_dir = path.parent().ok_or(anyhow!("expected file with parent dir"))?;
 
         // For entries that are in directories, take the directory name. For entries that are
         // directly in the group directory, strip the file suffix.
@@ -198,9 +202,7 @@ impl EntryMeta {
         let (dt, slug) = file_name_into_date_and_slug(&file_name);
         if let Some(dt) = dt {
             let (date, time) = dt;
-            let out_file = PathBuf::from(format!("{}", date.year))
-                .join(slug)
-                .join("index.html");
+            let out_file = PathBuf::from(format!("{}", date.year)).join(slug).join("index.html");
             let out_asset_dir = PathBuf::from(format!("{}", date.year)).join(slug);
             Ok(EntryMeta {
                 sort_key: file_name.to_owned(),
@@ -208,13 +210,12 @@ impl EntryMeta {
                 date: Some(date),
                 time,
                 slug: slug.to_owned(),
+                source_kind,
                 file_path: path.to_owned(),
                 asset_dir: parent_dir.to_owned(),
                 canonical_name,
                 permalink: ctx.path_to_absolute_url(&out_file).expect("valid path"),
-                asset_url: ctx
-                    .path_to_absolute_url(&out_asset_dir)
-                    .expect("valid path"),
+                asset_url: ctx.path_to_absolute_url(&out_asset_dir).expect("valid path"),
                 out_file,
                 out_asset_dir,
             })
@@ -231,13 +232,12 @@ impl EntryMeta {
                 date: None,
                 time: None,
                 slug: slug.to_owned(),
+                source_kind,
                 file_path: path.to_owned(),
                 asset_dir: parent_dir.to_owned(),
                 canonical_name,
                 permalink: ctx.path_to_absolute_url(&out_file).expect("valid path"),
-                asset_url: ctx
-                    .path_to_absolute_url(&out_asset_dir)
-                    .expect("valid path"),
+                asset_url: ctx.path_to_absolute_url(&out_asset_dir).expect("valid path"),
                 out_file,
                 out_asset_dir,
             })
