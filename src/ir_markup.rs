@@ -54,7 +54,7 @@ impl<'s> Attributes<'s> {
             .find_map(|(attribute_, value)| (*attribute_ == attribute).then(|| value))
     }
 
-    pub fn push(&mut self, attribute: impl Into<Cow<'s, str>>, value: impl Into<AttributeValue<'s>>) {
+    pub fn insert(&mut self, attribute: impl Into<Cow<'s, str>>, value: impl Into<AttributeValue<'s>>) {
         let attribute = attribute.into();
 
         if let Some(entry) = self
@@ -86,7 +86,7 @@ impl<'s> From<jotdown::Attributes<'s>> for Attributes<'s> {
         let mut attributes_ = Attributes::with_capacity(attributes.len());
 
         for (attr, val) in attributes {
-            attributes_.push(attr, val);
+            attributes_.insert(attr, val);
         }
 
         attributes_
@@ -1071,10 +1071,10 @@ mod tests {
     fn attr_alphabetical() {
         let mut attributes = Attributes::new();
 
-        attributes.push("foo", "");
-        attributes.push("bar", "");
-        attributes.push("qux", "");
-        attributes.push("cafe", "");
+        attributes.insert("foo", "");
+        attributes.insert("bar", "");
+        attributes.insert("qux", "");
+        attributes.insert("cafe", "");
 
         let mut iter = attributes.into_iter();
         assert_eq!(iter.next().unwrap().0, Cow::from("bar"));
@@ -1088,9 +1088,9 @@ mod tests {
     fn attr_override() {
         let mut attributes = Attributes::new();
 
-        attributes.push("foo", "");
+        attributes.insert("foo", "");
         assert_eq!(attributes.get("foo").unwrap(), &AttributeValue::Raw("".into()),);
-        attributes.push("foo", "bar");
+        attributes.insert("foo", "bar");
         assert_eq!(attributes.get("foo").unwrap(), &AttributeValue::Raw("bar".into()),);
     }
 }
