@@ -70,6 +70,18 @@ body > section {
   }
 }
 
+@media (max-width: 50rem) {
+  body > section {
+    flex-direction: column-reverse;
+
+    > nav {
+      border-top: 0.2rem dotted var(--themeColor);
+      padding-top: 2rem; /* equal to flex gap between main and nav */
+      width: 100%;
+    }
+  }
+}
+
 h1 {
   font-size: 2rem;
 }
