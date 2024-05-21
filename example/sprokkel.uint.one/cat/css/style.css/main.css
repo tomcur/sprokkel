@@ -193,11 +193,19 @@ a:not(.unstyled)[href] {
   font-size: 1.7rem;
   line-height: 1;
   font-weight: 600;
+  position: relative;
 }
+
 .header-logo img,
 .footer-logo img {
   height: 2em;
   margin-bottom: -0.6em;
+}
+
+.header-logo img {
+  position: absolute;
+  top: -0.5rem;
+  right: -4rem;
 }
 
 #color-scheme-toggle {
