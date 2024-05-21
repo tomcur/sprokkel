@@ -187,11 +187,6 @@ a:not(.unstyled)[href] {
   margin-left: 1ch;
 }
 
-.header-logo svg {
-  height: 3rem;
-  width: auto;
-}
-
 .header-logo {
   flex: 0;
   white-space: nowrap;
