@@ -199,7 +199,6 @@ a:not(.unstyled)[href] {
 .header-logo img,
 .footer-logo img {
   height: 2em;
-  margin-bottom: -0.6em;
 }
 
 .header-logo img {
